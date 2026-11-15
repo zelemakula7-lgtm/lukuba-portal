@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LUKUBA SHOP</title>
+<style>
+:root{--n:#0b2545;--t:#13a89e;--bg:#f2f5f9;--c:#fff;--tx:#17212f;--m:#6b7788;--r:#d64545;--ok:#1f9d55}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:var(--n);color:#fff;padding:10px 14px;position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+header b{font-size:18px;margin-right:auto}header button{background:transparent;color:#fff;border:1px solid #ffffff55;padding:6px 10px;border-radius:8px}
+header button.on{background:var(--t);border-color:var(--t)}
+main{max-width:1000px;margin:auto;padding:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.card{background:var(--c);border-radius:12px;padding:10px;box-shadow:0 1px 4px #0001}
+.card img,.ph{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#e3e9f0;display:block}
+.ph{display:flex;align-items:center;justify-content:center;color:var(--m)}
+.pr{color:var(--n);font-weight:700}.mu{color:var(--m);font-size:13px}
+button,input,select,textarea{font:inherit}
+.b{background:var(--t);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+.b.s{background:#e6ebf1;color:var(--tx)}.b.d{background:var(--r)}.b.g{background:var(--ok)}.b:disabled{opacity:.45;cursor:not-allowed}
+input,select,textarea{width:100%;padding:9px;border:1px solid #cdd5df;border-radius:8px;margin:4px 0 8px;background:#fff}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:700;background:#e6ebf1}
+.oos{background:var(--r);color:#fff}.in{background:#d9f3e4;color:#14703c}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sp{margin-left:auto}
+.box{background:var(--c);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px #0001}
+.narrow{max-width:380px;margin:30px auto}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:9}
+#toast div{background:var(--n);color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 2px 8px #0005}
+.st-Pending{background:#fff1cc}.st-Confirmed{background:#d6e8ff}.st-Processing{background:#e4dcff}.st-Delivered{background:#d9f3e4}.st-Cancelled{background:#fcdcdc}
+.st-Ready\ for\ Collection,.st-Out\ for\ Delivery{background:#d3f4f1}
+table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #e3e9f0;text-align:left;font-size:14px}
+</style>
+</head>
+<body>
+<header id="hd"></header>
+<main id="app"></main>
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ====== 1. WEKA FIREBASE CONFIG YAKO HAPA (Firebase Console > Project settings > Your apps > Web) ====== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBzfscDVyn7Mpu43t2XkOs1yCkFSBlA2m4",
+  authDomain: "lukuba-shop-4fc20.firebaseapp.com",
+  projectId: "lukuba-shop-4fc20",
+  storageBucket: "lukuba-shop-4fc20.firebasestorage.app",
+  messagingSenderId: "939958932227",
+  appId: "1:939958932227:web:02d9325d8ac55169694f36"
+};
+/* ========================================================================================================= */
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const TZS = n => 'TSh ' + Number(n || 0).toLocaleString('en-US');
+const ST = ['Pending','Confirmed','Processing','Ready for Collection','Out for Delivery','Delivered','Cancelled'];
+const SW = {Pending:'Inasubiri','Confirmed':'Imethibitishwa',Processing:'Inaandaliwa','Ready for Collection':'Tayari kuchukuliwa','Out for Delivery':'Iko njiani (Delivery)',Delivered:'Imekamilika',Cancelled:'Imeghairiwa'};
+
+let db, auth, me = null, P = {}, cart = {}, myO = [], allO = [], view = 'shop', tab = 'orders', q = '', cat = '', ofilter = '', mode = 'login', regData = null, unsub = [], firstO = true;
+try { cart = JSON.parse(localStorage.getItem('lk_cart') || '{}'); } catch (e) {}
+const isStaff = () => me && ['boss','manager','cashier'].includes(me.role);
+const isMgr = () => me && ['boss','manager'].includes(me.role);
+const saveCart = () => { try { localStorage.setItem('lk_cart', JSON.stringify(cart)); } catch (e) {} };
+const cartCount = () => Object.values(cart).reduce((a, b) => a + b, 0);
+
+function toast(m) {
+  const d = document.createElement('div'); d.textContent = m; $('#toast').appendChild(d);
+  setTimeout(() => d.remove(), 5000);
+  try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(); o.connect(a.destination); o.frequency.value = 880; o.start(); o.stop(a.currentTime + .2); } catch (e) {}
+  try { if (window.Notification && Notification.permission === 'granted') new Notification('LUKUBA SHOP', { body: m }); } catch (e) {}
+}
+
+/* ---------- START ---------- */
+if (FIREBASE_CONFIG.apiKey === 'WEKA_HAPA') {
+  document.addEventListener('DOMContentLoaded', () => {
+    $('#app').innerHTML = '<div class="box"><h2>Weka Firebase config</h2><p>Fungua faili hili, tafuta <b>FIREBASE_CONFIG</b> na ubandike taarifa za project yako ya Firebase.</p></div>';
+  });
+} else {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.firestore(); auth = firebase.auth();
+  db.collection('products').onSnapshot(s => { P = {}; s.forEach(x => P[x.id] = { id: x.id, ...x.data() }); render(); });
+  auth.onAuthStateChanged(async u => {
+    unsub.forEach(f => f()); unsub = []; myO = []; allO = []; firstO = true;
+    if (!u) { me = null; render(); return; }
+    let d = await db.collection('users').doc(u.uid).get();
+    if (!d.exists) {
+      const nd = { name: regData?.name || u.email, phone: regData?.phone || '', email: u.email, role: 'customer' };
+      await db.collection('users').doc(u.uid).set(nd); d = await db.collection('users').doc(u.uid).get();
+    }
+    me = { id: u.uid, ...d.data() };
+    const col = db.collection('orders');
+    const src = isStaff() ? col : col.where('uid', '==', u.uid);
+    unsub.push(src.onSnapshot(s => {
+      s.docChanges().forEach(c => {
+        if (firstO) return;
+        const o = c.doc.data();
+        if (isStaff() && c.type === 'added') toast('Oda mpya #' + o.no + ' - ' + o.cname + ' - ' + TZS(o.total));
+        if (!isStaff() && c.type === 'modified') toast('Oda #' + o.no + ': ' + SW[o.status]);
+      });
+      firstO = false;
+      const arr = s.docs.map(x => ({ id: x.id, ...x.data() })).sort((a, b) => b.no - a.no);
+      if (isStaff()) allO = arr; else myO = arr;
+      render();
+    }));
+    try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
+    view = isStaff() ? 'admin' : 'shop'; render();
+  });
+}
+
+/* ---------- RENDER ---------- */
+function render() {
+  if (!$('#app')) return;
+  const nav = (v, t) => `<button class="${view === v ? 'on' : ''}" onclick="go('${v}')">${t}</button>`;
+  $('#hd').innerHTML = `<b>🛒 LUKUBA SHOP</b>${nav('shop', 'Bidhaa')}${nav('cart', 'Cart (' + cartCount() + ')')}` +
+    (me ? (nav('orders', 'Oda zangu') + (isStaff() ? nav('admin', 'Usimamizi') : '') + `<button onclick="auth.signOut()">Toka</button>`) : nav('auth', 'Ingia'));
+  const a = $('#app'), keep = document.activeElement?.id;
+  a.innerHTML = { shop: vShop, cart: vCart, orders: vOrders, admin: vAdmin, auth: vAuth }[view]();
+  if (keep && $('#' + keep) && keep === 'q') { const e = $('#q'); e.focus(); e.setSelectionRange(e.value.length, e.value.length); }
+}
+function go(v) { if ((v === 'orders') && !me) v = 'auth'; view = v; render(); scrollTo(0, 0); }
+
+function vAuth() {
+  const reg = mode === 'reg';
+  return `<div class="box narrow"><h2>${reg ? 'Jisajili' : 'Ingia'}</h2>
+  ${reg ? '<input id="rn" placeholder="Jina kamili"><input id="rp" placeholder="Namba ya simu (mf. 0712345678)" type="tel">' : ''}
+  <input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password (angalau herufi 6)">
+  <button class="b" style="width:100%" onclick="${reg ? 'doReg()' : 'doLogin()'}">${reg ? 'Jisajili' : 'Ingia'}</button>
+  <p class="mu" style="text-align:center;cursor:pointer" onclick="mode='${reg ? 'login' : 'reg'}';render()">${reg ? 'Tayari una akaunti? Ingia' : 'Huna akaunti? Jisajili'}</p></div>`;
+}
+const authErr = e => alert('Hitilafu: ' + ({ 'auth/invalid-credential': 'Email au password si sahihi', 'auth/email-already-in-use': 'Email tayari imesajiliwa', 'auth/weak-password': 'Password ni fupi sana' }[e.code] || e.message));
+async function doLogin() { try { await auth.signInWithEmailAndPassword($('#em').value.trim(), $('#pw').value); } catch (e) { authErr(e); } }
+async function doReg() {
+  const n = $('#rn').value.trim(), p = $('#rp').value.trim();
+  if (!n || !p) return alert('Jaza jina na namba ya simu');
+  regData = { name: n, phone: p };
+  try { await auth.createUserWithEmailAndPassword($('#em').value.trim(), $('#pw').value); } catch (e) { authErr(e); }
+}
+
+function vShop() {
+  const cats = [...new Set(Object.values(P).filter(p => p.active).map(p => p.category).filter(Boolean))];
+  const list = Object.values(P).filter(p => p.active && (!cat || p.category === cat) && (!q || (p.name + ' ' + (p.category || '')).toLowerCase().includes(q.toLowerCase())))
+    .sort((a, b) => (b.stock > 0) - (a.stock > 0) || a.name.localeCompare(b.name));
+  return `<div class="row"><input id="q" placeholder="🔍 Tafuta bidhaa..." value="${esc(q)}" oninput="q=this.value;render()" style="flex:2">
+  <select onchange="cat=this.value;render()" style="flex:1"><option value="">Category zote</option>${cats.map(c => `<option ${c === cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+  <div class="grid">${list.map(p => `<div class="card">${p.img ? `<img src="${p.img}" alt="">` : '<div class="ph">Hakuna picha</div>'}
+  <div style="margin-top:6px"><b>${esc(p.name)}</b></div><div class="mu">${esc(p.desc || '')}</div>
+  <div class="pr">${TZS(p.price)}</div>
+  <div style="margin:6px 0">${p.stock > 0 ? `<span class="tag in">Zilizopo: ${p.stock}</span>` : '<span class="tag oos">OUT OF STOCK</span>'}</div>
+  <button class="b" style="width:100%" ${p.stock > 0 ? '' : 'disabled'} onclick="addCart('${p.id}')">${p.stock > 0 ? 'Weka kwenye cart' : 'Imeisha'}</button></div>`).join('') || '<p class="mu">Hakuna bidhaa.</p>'}</div>`;
+}
+function addCart(id) {
+  const p = P[id]; if (!p || p.stock < 1) return;
+  if ((cart[id] || 0) + 1 > p.stock) return toast('Zilizobaki ni ' + p.stock + ' tu');
+  cart[id] = (cart[id] || 0) + 1; saveCart(); render(); toast(p.name + ' imeongezwa');
+}
+function chQty(id, d) {
+  const p = P[id], n = (cart[id] || 0) + d;
+  if (n <= 0) delete cart[id]; else if (p && n > p.stock) return toast('Zilizobaki ni ' + p.stock + ' tu'); else cart[id] = n;
+  saveCart(); render();
+}
+function vCart() {
+  const ids = Object.keys(cart).filter(i => P[i]);
+  if (!ids.length) return '<div class="box">Cart yako ni tupu.</div>';
+  const tot = ids.reduce((a, i) => a + P[i].price * cart[i], 0);
+  return `<div class="box">${ids.map(i => `<div class="row" style="padding:6px 0;border-bottom:1px solid #e3e9f0"><div><b>${esc(P[i].name)}</b><div class="mu">${TZS(P[i].price)}${P[i].stock < cart[i] || !P[i].active ? ' <span style="color:var(--r)">(stock haitoshi)</span>' : ''}</div></div>
+  <div class="sp row"><button class="b s" onclick="chQty('${i}',-1)">−</button><b>${cart[i]}</b><button class="b s" onclick="chQty('${i}',1)">+</button><b style="min-width:100px;text-align:right">${TZS(P[i].price * cart[i])}</b></div></div>`).join('')}
+  <h3 style="text-align:right">Jumla: ${TZS(tot)}</h3>
+  ${me ? `<select id="m" onchange="$('#adw').style.display=this.value==='delivery'?'block':'none'"><option value="pickup">Nitajichukulia dukani</option><option value="delivery">Naomba delivery</option></select>
+  <div id="adw" style="display:none"><input id="ad" placeholder="Anwani ya delivery (eneo, mtaa, alama)"></div>
+  <textarea id="nt" rows="2" placeholder="Maelezo ya ziada (si lazima)"></textarea>
+  <button class="b g" id="pb" style="width:100%" onclick="placeOrder()">Thibitisha na Tuma Oda</button>` : '<button class="b" style="width:100%" onclick="go(\'auth\')">Ingia ili kutuma oda</button>'}</div>`;
+}
+
+async function placeOrder() {
+  const ids = Object.keys(cart).filter(i => cart[i] > 0);
+  const method = $('#m').value, addr = ($('#ad')?.value || '').trim(), note = $('#nt').value.trim();
+  if (!ids.length) return;
+  if (method === 'delivery' && !addr) return alert('Weka anwani ya delivery');
+  $('#pb').disabled = true;
+  try {
+    const cref = db.collection('meta').doc('counter'), oref = db.collection('orders').doc();
+    let no = 0;
+    await db.runTransaction(async t => {
+      const cs = await t.get(cref);
+      no = (cs.exists ? cs.data().n : 1000) + 1;
+      const refs = ids.map(i => db.collection('products').doc(i));
+      const snaps = await Promise.all(refs.map(r => t.get(r)));
+      const items = [];
+      snaps.forEach((s, k) => {
+        if (!s.exists) throw new Error('Bidhaa haipatikani tena');
+        const p = s.data(), n = cart[ids[k]];
+        if (!p.active || p.stock < n) throw new Error('"' + p.name + '" haitoshi. Zilizobaki: ' + (p.active ? p.stock : 0));
+        items.push({ id: ids[k], name: p.name, price: p.price, qty: n });
+      });
+      snaps.forEach((s, k) => t.update(refs[k], { stock: s.data().stock - cart[ids[k]] }));
+      t.set(cref, { n: no });
+      t.set(oref, { no, uid: me.id, cname: me.name, phone: me.phone || '', items, total: items.reduce((a, i) => a + i.price * i.qty, 0),
+        method, addr, note, status: 'Pending', at: firebase.firestore.FieldValue.serverTimestamp() });
+    });
+    cart = {}; saveCart(); view = 'orders'; render(); toast('Oda #' + no + ' imetumwa. Subiri uthibitisho.');
+  } catch (e) { alert(e.message); const b = $('#pb'); if (b) b.disabled = false; }
+}
+
+function oCard(o, staff) {
+  const nx = ST.filter(s => s !== o.status);
+  return `<div class="box st-${o.status}"><div class="row"><b>Oda #${o.no}</b><span class="tag">${SW[o.status]} (${o.status})</span>
+  <span class="mu sp">${o.at?.toDate ? o.at.toDate().toLocaleString('sw-TZ') : ''}</span></div>
+  ${staff ? `<div>👤 ${esc(o.cname)} · 📞 ${esc(o.phone)}</div>` : ''}
+  <div class="mu">${o.method === 'delivery' ? '🚚 Delivery: ' + esc(o.addr) : '🏪 Kuchukua dukani'}${o.note ? ' · ' + esc(o.note) : ''}</div>
+  <table>${o.items.map(i => `<tr><td>${esc(i.name)}</td><td>${i.qty} × ${TZS(i.price)}</td><td>${TZS(i.qty * i.price)}</td></tr>`).join('')}</table>
+  <h4 style="text-align:right;margin:6px 0">Jumla: ${TZS(o.total)}</h4>
+  ${staff && !['Cancelled', 'Delivered'].includes(o.status) ? (o.status === 'Pending'
+    ? `<div class="row"><button class="b g" onclick="setSt('${o.id}','Confirmed')">✔ Kubali</button><button class="b d" onclick="setSt('${o.id}','Cancelled')">✖ Kataa</button></div>`
+    : `<div class="row"><select id="s${o.id}" style="max-width:240px;margin:0">${nx.map(s => `<option>${s}</option>`).join('')}</select><button class="b" onclick="setSt('${o.id}',$('#s${o.id}').value)">Badilisha hali</button></div>`) : ''}</div>`;
+}
+function vOrders() { return myO.length ? myO.map(o => oCard(o, false)).join('') : '<div class="box">Bado hujafanya oda.</div>'; }
+
+async function setSt(id, st) {
+  if (st === 'Cancelled' && !confirm('Kuikataa/kuighairi oda kutarudisha stock. Endelea?')) return;
+  try {
+    await db.runTransaction(async t => {
+      const r = db.collection('orders').doc(id), o = (await t.get(r)).data();
+      if (['Cancelled', 'Delivered'].includes(o.status)) throw new Error('Oda hii imefungwa tayari');
+      if (st === 'Cancelled') {
+        const refs = o.items.map(i => db.collection('products').doc(i.id));
+        const ps = await Promise.all(refs.map(x => t.get(x)));
+        ps.forEach((p, k) => { if (p.exists) t.update(refs[k], { stock: p.data().stock + o.items[k].qty }); });
+      }
+      t.update(r, { status: st });
+    });
+  } catch (e) { alert(e.message); }
+}
+
+/* ---------- ADMIN ---------- */
+function vAdmin() {
+  if (!isStaff()) return '<div class="box">Huna ruhusa.</div>';
+  const tabs = [['orders', 'Oda']].concat(isMgr() ? [['prod', 'Bidhaa'], ['cust', 'Wateja'], ['top', 'Zinazouzwa zaidi']] : []);
+  return `<div class="row" style="margin-bottom:10px">${tabs.map(t => `<button class="b ${tab === t[0] ? '' : 's'}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</div>` +
+    ({ orders: aOrders, prod: aProd, cust: aCust, top: aTop }[tab] || aOrders)();
+}
+function aOrders() {
+  const l = allO.filter(o => !ofilter || o.status === ofilter);
+  return `<select onchange="ofilter=this.value;render()"><option value="">Hali zote (${allO.length})</option>${ST.map(s => `<option ${s === ofilter ? 'selected' : ''} value="${s}">${s} (${allO.filter(o => o.status === s).length})</option>`).join('')}</select>` +
+    (l.map(o => oCard(o, true)).join('') || '<div class="box">Hakuna oda.</div>');
+}
+function aProd() {
+  const l = Object.values(P).sort((a, b) => a.name.localeCompare(b.name));
+  return `<div class="box"><h3>Ongeza bidhaa</h3><input id="pn" placeholder="Jina la bidhaa"><input id="pc" placeholder="Category"><input id="pd" placeholder="Maelezo">
+  <div class="row"><input id="pp" type="number" placeholder="Bei (TSh)" style="flex:1"><input id="ps" type="number" placeholder="Stock" style="flex:1"></div>
+  <input id="pi" type="file" accept="image/*"><button class="b" id="sb" onclick="addProd()">Hifadhi bidhaa</button></div>` +
+    l.map(p => `<div class="box row">${p.img ? `<img src="${p.img}" style="width:60px;height:60px;object-fit:cover;border-radius:8px">` : ''}
+    <div><b>${esc(p.name)}</b> ${p.active ? '' : '<span class="tag oos">Imeondolewa</span>'}<div class="mu">${esc(p.category || '')} · ${TZS(p.price)} · Stock: ${p.stock}</div></div>
+    <div class="sp row"><button class="b s" onclick="chPrice('${p.id}')">Bei</button><button class="b s" onclick="addStock('${p.id}')">+ Stock</button>
+    <button class="b s" onclick="chImg('${p.id}')">Picha</button>
+    <button class="b ${p.active ? 'd' : 'g'}" onclick="db.collection('products').doc('${p.id}').update({active:${!p.active}})">${p.active ? 'Ondoa' : 'Rudisha'}</button></div></div>`).join('');
+}
+function resize(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => { const i = new Image(); i.onload = () => { const s = Math.min(1, 500 / Math.max(i.width, i.height)), c = document.createElement('canvas');
+      c.width = i.width * s; c.height = i.height * s; c.getContext('2d').drawImage(i, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', .72)); }; i.onerror = rej; i.src = r.result; };
+    r.onerror = rej; r.readAsDataURL(file);
+  });
+}
+async function addProd() {
+  const n = $('#pn').value.trim(), pr = Number($('#pp').value), st = parseInt($('#ps').value || '0');
+  if (!n || !(pr >= 0) || !(st >= 0)) return alert('Jaza jina, bei na stock kwa usahihi');
+  $('#sb').disabled = true;
+  const f = $('#pi').files[0];
+  await db.collection('products').add({ name: n, category: $('#pc').value.trim(), desc: $('#pd').value.trim(), price: pr, stock: st, active: true, img: f ? await resize(f) : '' });
+  toast('Bidhaa imehifadhiwa');
+}
+function chPrice(id) { const v = prompt('Bei mpya (TSh):', P[id].price); if (v !== null && Number(v) >= 0 && v !== '') db.collection('products').doc(id).update({ price: Number(v) }); }
+function addStock(id) { const v = parseInt(prompt('Ongeza stock kiasi gani? (mf. 30)', '')); if (v) db.collection('products').doc(id).update({ stock: firebase.firestore.FieldValue.increment(v) }); }
+function chImg(id) {
+  const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*';
+  i.onchange = async () => { if (i.files[0]) { await db.collection('products').doc(id).update({ img: await resize(i.files[0]) }); toast('Picha imebadilishwa'); } }; i.click();
+}
+function aCust() {
+  const m = {};
+  allO.filter(o => o.status !== 'Cancelled').forEach(o => { const c = m[o.uid] = m[o.uid] || { n: o.cname, p: o.phone, c: 0, t: 0 }; c.c++; c.t += o.total; });
+  const l = Object.values(m).sort((a, b) => b.t - a.t);
+  return `<div class="box"><table><tr><th>Mteja</th><th>Simu</th><th>Oda</th><th>Jumla</th></tr>${l.map(c => `<tr><td>${esc(c.n)}</td><td>${esc(c.p)}</td><td>${c.c}</td><td>${TZS(c.t)}</td></tr>`).join('') || '<tr><td colspan=4>Hakuna bado</td></tr>'}</table></div>`;
+}
+function aTop() {
+  const m = {};
+  allO.filter(o => o.status !== 'Cancelled').forEach(o => o.items.forEach(i => { const x = m[i.id] = m[i.id] || { n: i.name, q: 0, t: 0 }; x.q += i.qty; x.t += i.qty * i.price; }));
+  const l = Object.values(m).sort((a, b) => b.q - a.q);
+  return `<div class="box"><table><tr><th>Bidhaa</th><th>Zilizouzwa</th><th>Mapato</th></tr>${l.map(x => `<tr><td>${esc(x.n)}</td><td>${x.q}</td><td>${TZS(x.t)}</td></tr>`).join('') || '<tr><td colspan=3>Hakuna bado</td></tr>'}</table></div>`;
+}
+document.addEventListener('DOMContentLoaded', render);
+</script>
+</body>
+</html>
