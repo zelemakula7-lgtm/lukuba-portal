@@ -83,7 +83,7 @@ function installApp() {
   if (dip) { dip.prompt(); dip.userChoice.finally(() => { dip = null; render(); }); }
   else alert('Android (Chrome): bonyeza ⋮ juu kulia, kisha "Add to Home screen" au "Install app".\n\niPhone (Safari): bonyeza kitufe cha Share, kisha "Add to Home Screen".');
 }
-const isStaff = () => me && ['boss','manager','cashier'].includes(me.role);
+const isStaff = () => me && ['boss','manager','cashier','sales','driver','operator'].includes(me.role);
 const isMgr = () => me && ['boss','manager'].includes(me.role);
 const saveCart = () => { try { localStorage.setItem('lk_cart', JSON.stringify(cart)); } catch (e) {} };
 const cartCount = () => Object.values(cart).reduce((a, b) => a + b, 0);
@@ -143,7 +143,7 @@ if (FIREBASE_CONFIG.apiKey === 'WEKA_HAPA') {
 function renderBanner() {
   const b = $('#bn'); if (!b) return;
   const m = (BIZ.marquee && BIZ.marquee.trim()) || DEF_MQ;
-  b.innerHTML = `<div class="brand"><img src="logo.png" alt="LUKUBA SHOP"></div><div class="mq"><span style="animation-duration:${Math.max(14, Math.round(m.length * .35))}s">${esc(m)}</span></div>`;
+  b.innerHTML = `<div class="brand"><img src="${BIZ.logo || 'logo.png'}" alt=""></div><div class="mq"><span style="animation-duration:${Math.max(14, Math.round(m.length * .35))}s">${esc(m)}</span></div>`;
 }
 function bizFooter() {
   if (!(BIZ.phone || BIZ.address || BIZ.email)) return '';
@@ -252,7 +252,7 @@ function oCard(o, staff) {
   <div class="mu">${o.method === 'delivery' ? '🚚 Delivery: ' + esc(o.addr) : '🏪 Kuchukua dukani'}${o.note ? ' · ' + esc(o.note) : ''}</div>
   <table>${o.items.map(i => `<tr><td>${esc(i.name)}</td><td>${i.qty} × ${TZS(i.price)}</td><td>${TZS(i.qty * i.price)}</td></tr>`).join('')}</table>
   <h4 style="text-align:right;margin:6px 0">Jumla: ${TZS(o.total)}</h4>${payInfo(o)}
-  <div class="row" style="margin-bottom:8px">${isStaff() ? szSel() : ''}<button class="b s" onclick="printReceipt('${o.id}')">🖨 Print Risiti</button></div>
+  <div class="row" style="margin-bottom:8px">${isStaff() ? szSel() : ''}<button class="b s" onclick="printReceipt('${o.id}')">🖨 Print Risiti</button>${isStaff() && o.status !== 'Cancelled' ? `<button class="b s" onclick="rvId='${o.id}';render()">✏ Review</button>` : ''}</div>
   ${staff && isMgr() && !['Cancelled', 'Delivered'].includes(o.status) ? (o.status === 'Pending'
     ? `<div class="row"><button class="b g" onclick="setSt('${o.id}','Confirmed')">✔ Kubali</button><button class="b d" onclick="setSt('${o.id}','Cancelled')">✖ Kataa</button></div>`
     : `<div class="row"><select id="s${o.id}" style="max-width:240px;margin:0">${nx.map(s => `<option>${s}</option>`).join('')}</select><button class="b" onclick="setSt('${o.id}',$('#s${o.id}').value)">Badilisha hali</button></div>`) : ''}</div>`;
@@ -263,6 +263,7 @@ function printReceipt(id) {
   const o = [...myO, ...allO].find(x => x.id === id); if (!o) return;
   const d = o.at && o.at.toDate ? o.at.toDate().toLocaleString('sw-TZ') : '';
   let logo = 'logo.png'; try { logo = new URL('logo.png', location.href).href; } catch (e) {}
+  if (BIZ.logo) logo = BIZ.logo;
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Risiti #${o.no}</title><style>
   body{font:14px Arial,sans-serif;max-width:${szW()};margin:0 auto;padding:12px;color:#000}.c{text-align:center}h2,h3{margin:4px 0}
   table{width:100%;border-collapse:collapse;margin:8px 0}td,th{padding:4px 2px;font-size:13px;text-align:left}th:last-child,td:last-child{text-align:right}
@@ -433,7 +434,7 @@ const szW=()=>SZW[psz],szPg=()=>SZP[psz];
 function subExtra(){
   if(!isStaff())return;
   const sub=(c,f)=>unsub.push(db.collection(c).onSnapshot(s=>{f(s);render()}));
-  sub('branches',s=>{BR={};s.forEach(x=>BR[x.id]={id:x.id,...x.data()})});
+  sub('branches',s=>{BR={};s.forEach(x=>BR[x.id]={id:x.id,...x.data()})});sub('customers',s=>CU=arr(s));sub('suppliers',s=>SUP=arr(s));unsub.push(db.collection('users').where('role','==','customer').onSnapshot(s=>{UC=arr(s);render()},()=>{}));
   if(isMgr()){sub('employees',s=>{EMP={};s.forEach(x=>EMP[x.id]={id:x.id,...x.data()})});sub('expenses',s=>EXP=arr(s));sub('purchases',s=>PUR=arr(s));sub('salaryPays',s=>SPAY=arr(s))}
 }
 function owed(e){const n=new Date(),[y,m]=(e.start||'').split('-').map(Number);if(!y)return 0;
@@ -478,9 +479,9 @@ async function confPay(id){const o=allO.find(x=>x.id===id),a=Number($('#pa'+id).
   try{await db.collection('orders').doc(id).update({paid:a,payStatus:'done',cashier:me.name,branch:o.branch||me.branch||''});
   toast(a<o.total?'Deni '+TZS(o.total-a)+' limeandikwa kwa '+o.cname:'Malipo yamethibitishwa')}catch(e){alert(e.message)}}
 /* --- Madeni --- */
-function aDebt(){const l=allO.filter(o=>o.status!=='Cancelled'&&o.payStatus==='done'&&dbt(o)>0),m={};
+function aDebt(){const l=allO.filter(o=>o.status!=='Cancelled'&&o.payStatus==='done'&&dbt(o)>0&&(!q||(o.cname||'').toLowerCase().includes(q.toLowerCase()))),m={};
   l.forEach(o=>{const c=m[o.uid+o.cname]=m[o.uid+o.cname]||{n:o.cname,p:o.phone,t:0};c.t+=dbt(o)});
-  return `<div class="box"><h3>Madeni ya wateja: ${TZS(sum(l,dbt))}</h3><table>${Object.values(m).map(c=>`<tr><td>${esc(c.n)}</td><td>${esc(c.p)}</td><td>${TZS(c.t)}</td></tr>`).join('')||'<tr><td>Hakuna madeni ✅</td></tr>'}</table></div>`+
+  return dl('dld',CL().map(c=>c.name))+`<input id="q" list="dld" placeholder="🔍 Tafuta mteja..." value="${esc(q)}" oninput="q=this.value;render()">`+`<div class="box"><h3>Madeni ya wateja: ${TZS(sum(l,dbt))}</h3><table>${Object.values(m).map(c=>`<tr><td>${esc(c.n)}</td><td>${esc(c.p)}</td><td>${TZS(c.t)}</td></tr>`).join('')||'<tr><td>Hakuna madeni ✅</td></tr>'}</table></div>`+
   l.map(o=>`<div class="box row"><div><b>#${o.no} ${esc(o.cname)}</b><div class="mu">Jumla ${TZS(o.total)} · Amelipa ${TZS(o.paid)}</div><b style="color:var(--r)">Deni ${TZS(dbt(o))}</b></div>
   <div class="sp row"><input id="dp${o.id}" type="number" placeholder="Kiasi" style="width:110px;margin:0"><button class="b g" onclick="recvDebt('${o.id}')">Pokea</button></div></div>`).join('')}
 async function recvDebt(id){const o=allO.find(x=>x.id===id),a=Number($('#dp'+id).value);
@@ -523,8 +524,8 @@ async function addMoney(c){const n=$('#m_n').value.trim(),a=Number($('#m_a').val
   try{await db.collection(c).add({name:n,amount:a,branch:me.branch||'',by:me.name,at:SV()});toast('Imehifadhiwa')}catch(e){alert(e.message)}}
 function delDoc(c,id){if(confirm('Futa rekodi hii?'))db.collection(c).doc(id).delete().catch(e=>alert(e.message))}
 /* --- Mishahara --- */
-function aSal(){const l=Object.values(EMP).filter(e=>!bsel||e.branch===bsel),tot=sum(l,owed);
-  return brSel()+`<div class="box"><h3>Mishahara</h3><p class="mu">Mfanyakazi asipochukua mshahara wa mwezi, deni lake linajumlishwa mwezi unaofuata automatically.</p><div class="row"><b>Jumla inayodaiwa: ${TZS(tot)}</b><button class="b g sp" ${tot>0?'':'disabled'} onclick="paySal()">Lipa wote</button></div></div>`+
+function aSal(){const l=Object.values(EMP).filter(e=>(!bsel||e.branch===bsel)&&(!q||e.name.toLowerCase().includes(q.toLowerCase()))),tot=sum(l,owed);
+  return dl('dle',Object.values(EMP).map(e=>e.name))+`<input id="q" list="dle" placeholder="🔍 Tafuta mfanyakazi..." value="${esc(q)}" oninput="q=this.value;render()">`+brSel()+`<div class="box"><h3>Mishahara</h3><p class="mu">Mfanyakazi asipochukua mshahara wa mwezi, deni lake linajumlishwa mwezi unaofuata automatically.</p><div class="row"><b>Jumla inayodaiwa: ${TZS(tot)}</b><button class="b g sp" ${tot>0?'':'disabled'} onclick="paySal()">Lipa wote</button></div></div>`+
   l.map(e=>`<div class="box row"><div><b>${esc(e.name)}</b> <span class="tag">${esc(e.role)}</span><div class="mu">${TZS(e.salary)}/mwezi · Tangu ${esc(e.start||'-')} · Tawi: ${esc(bn(e.branch))}</div><b style="color:${owed(e)>0?'var(--r)':'var(--ok)'}">Anadai: ${TZS(owed(e))}</b></div>
   <div class="sp row"><button class="b g" onclick="paySal('${e.id}')">Lipa</button><button class="b s" onclick="editSal('${e.id}')">Mshahara</button></div></div>`).join('')||'<div class="box">Ongeza wafanyakazi kwenye tab ya Wafanyakazi.</div>'}
 async function paySal(id){const l=id?[EMP[id]]:Object.values(EMP).filter(e=>owed(e)>0),amt={};
@@ -535,9 +536,9 @@ function editSal(id){const v=Number(prompt('Mshahara mpya kwa mwezi (TSh):',EMP[
 /* --- Wafanyakazi (akaunti) --- */
 function aStaff(){const bo=Object.values(BR).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
   return `<div class="box"><h3>Ongeza mfanyakazi (akaunti)</h3><input id="f_n" placeholder="Jina kamili"><input id="f_p" type="tel" placeholder="Simu"><input id="f_e" type="email" placeholder="Email (ya kuingia)"><input id="f_w" type="password" placeholder="Password (herufi 6+)">
-  <select id="f_r"><option value="cashier">Cashier</option>${me.role==='boss'?'<option value="manager">Manager</option>':''}</select><select id="f_b"><option value="">Tawi: hakuna</option>${bo}</select>
+  <select id="f_r"><option value="cashier">Cashier</option><option value="sales">Sales</option><option value="driver">Driver</option><option value="operator">Operator</option>${me.role==='boss'?'<option value="manager">Manager</option>':''}</select><select id="f_b"><option value="">Tawi: hakuna</option>${bo}</select>
   <input id="f_s" type="number" placeholder="Mshahara kwa mwezi (TSh)"><label class="mu">Anaanza mshahara mwezi:</label><input id="f_m" type="month" value="${new Date().toISOString().slice(0,7)}"><button class="b" onclick="addStaff()">Tengeneza akaunti</button></div>`+
-  Object.values(EMP).map(e=>`<div class="box row"><div><b>${esc(e.name)}</b> <span class="tag">${esc(e.role)}</span><div class="mu">${esc(e.phone||'')} · Tawi: ${esc(bn(e.branch))}</div></div><button class="b d sp" onclick="delStaff('${e.id}')">Zima</button></div>`).join('')}
+  Object.values(EMP).map(e=>`<div class="box row"><div><b>${esc(e.name)}</b> <select onchange="setRole('${e.id}',this.value)" style="width:auto;margin:0">${ROLES.map(r=>`<option ${r===e.role?'selected':''}>${r}</option>`).join('')}</select><div class="mu">${esc(e.phone||'')} · Tawi: ${esc(bn(e.branch))}</div></div><button class="b d sp" onclick="delStaff('${e.id}')">Zima</button></div>`).join('')}
 async function addStaff(){const g=i=>$('#'+i).value.trim(),n=g('f_n'),em=g('f_e'),pw=$('#f_w').value;if(!n||!em||pw.length<6)return alert('Jaza jina, email na password (herufi 6+)');
   try{const a2=(firebase.apps.find(a=>a.name==='sec')||firebase.initializeApp(FIREBASE_CONFIG,'sec')).auth(),c=await a2.createUserWithEmailAndPassword(em,pw),u=c.user.uid,r=g('f_r'),br=g('f_b'),ph=g('f_p'),sl=Number(g('f_s'))||0,st=g('f_m');
   await db.collection('users').doc(u).set({name:n,phone:ph,email:em,role:r,branch:br});await db.collection('employees').doc(u).set({name:n,phone:ph,role:r,branch:br,salary:sl,start:st});
@@ -567,6 +568,87 @@ function aRep(){return `<div class="box"><h3>📑 Ripoti</h3><div class="row"><s
 function printHtml(h){const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
   f.contentDocument.open();f.contentDocument.write(`<!doctype html><html><head><meta charset="utf-8"><style>body{font:13px Arial;margin:8px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #999;padding:4px;text-align:left}@page{size:${szPg()};margin:4mm}</style></head><body><h3>${esc(BIZ.name||'LUKUBA SHOP')}</h3>${h}</body></html>`);f.contentDocument.close();
   setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){}setTimeout(()=>f.remove(),3000)},500)}
+</script>
+<script>
+/* ===== TOLEO 2: dropdown za kutafuta, Supplies, Wateja, Cart ya manunuzi, Review, Roles, Akaunti, Setting ===== */
+let CU=[],SUP=[],UC=[],bc=[],bsup='',rvId=null,tmpLogo=null;
+const ROLES=['boss','manager','cashier','sales','driver','operator'],
+dl=(id,a)=>`<datalist id="${id}">${a.map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`,
+CL=()=>[...UC.map(u=>({id:u.id,name:u.name,phone:u.phone||''})),...CU],
+byName=(a,n)=>a.find(x=>x.name===(n||'').trim()),
+TL={dash:'📊 Dashboard',orders:'Oda',pay:'Malipo',pos:'Uza',debt:'Madeni',prod:'Bidhaa',buy:'Manunuzi',sup:'Supplies',exp:'Matumizi',sal:'Mishahara',staff:'Wafanyakazi',br:'Matawi',rep:'Ripoti',cust:'Wateja',top:'Zinazouzwa',biz:'⚙ Setting',me:'👤 Akaunti yangu'},
+RT={cashier:['pay','pos','debt','orders','cust','me'],sales:['pos','orders','cust','me'],driver:['orders','me'],operator:['prod','buy','sup','orders','me']};
+function vAdmin(){
+  if(!isStaff())return '<div class="box">Huna ruhusa.</div>';
+  const T=isMgr()?['dash','orders','pay','pos','debt','prod','buy','sup','exp','sal','staff','br','rep','cust','top','biz','me']:(RT[me.role]||['orders','me']);
+  if(!seen){seen=1;tab=T[0]}if(!T.includes(tab))tab=T[0];
+  const F={dash:aDash,orders:aOrders,pay:aPay,pos:aPos,debt:aDebt,prod:aProd,buy:aBuy,sup:aSup,exp:()=>aMoney('expenses','Matumizi'),sal:aSal,staff:aStaff,br:aBr,rep:aRep,cust:aCust,top:aTop,biz:aBiz,me:aMe};
+  return `<div class="row tabs" style="margin-bottom:10px">${T.map(t=>`<button class="b ${tab===t?'':'s'}" onclick="tab='${t}';render()">${TL[t]}</button>`).join('')}</div>`+F[tab]();
+}
+/* Wateja (wote sehemu moja) */
+function aCust(){const ord={};allO.filter(o=>o.status!=='Cancelled').forEach(o=>{const c=ord[o.uid]=ord[o.uid]||{c:0,t:0};c.c++;c.t+=o.total});
+  const l=[...UC.map(u=>({...u,k:'📱 Mtandaoni'})),...CU.map(u=>({...u,k:'🏪 Dukani'}))].filter(c=>!q||(c.name+(c.phone||'')).toLowerCase().includes(q.toLowerCase()));
+  return `<div class="box"><h3>Ongeza mteja (dukani)</h3><input id="c_n" placeholder="Jina"><input id="c_p" type="tel" placeholder="Simu (si lazima)"><button class="b" onclick="addCus()">Hifadhi</button></div>
+  <input id="q" placeholder="🔍 Tafuta mteja..." value="${esc(q)}" oninput="q=this.value;render()"><div class="box"><table><tr><th>Mteja</th><th>Aina</th><th>Oda</th><th>Jumla</th></tr>${l.map(c=>`<tr><td>${esc(c.name)}<div class="mu">${esc(c.phone||'Hana simu')}</div></td><td>${c.k}</td><td>${(ord[c.id]||{c:0}).c}</td><td>${TZS((ord[c.id]||{t:0}).t)}</td></tr>`).join('')||'<tr><td colspan=4>Hakuna</td></tr>'}</table></div>`}
+async function addCus(){const n=$('#c_n').value.trim();if(!n)return alert('Andika jina');if(byName(CL(),n))return alert('Mteja huyu yupo tayari');
+  try{await db.collection('customers').add({name:n,phone:$('#c_p').value.trim(),at:SV()});toast('Mteja ameongezwa')}catch(e){alert(e.message)}}
+/* Supplies */
+function aSup(){return `<div class="box"><h3>Ongeza msambazaji</h3><input id="s_n" placeholder="Jina"><input id="s_p" type="tel" placeholder="Simu"><input id="s_a" placeholder="Anwani / bidhaa anazouza"><button class="b" onclick="addSup()">Hifadhi</button></div>`+
+  SUP.map(s=>`<div class="box row"><div><b>${esc(s.name)}</b><div class="mu">${esc(s.phone||'')} · ${esc(s.addr||'')}</div><div class="mu">Manunuzi: ${TZS(sum(PUR.filter(p=>p.supplier===s.name),p=>p.amount))}</div></div><button class="b d sp" onclick="delDoc('suppliers','${s.id}')">Futa</button></div>`).join('')}
+async function addSup(){const n=$('#s_n').value.trim();if(!n)return alert('Andika jina');try{await db.collection('suppliers').add({name:n,phone:$('#s_p').value.trim(),addr:$('#s_a').value.trim()});toast('Imehifadhiwa')}catch(e){alert(e.message)}}
+/* Manunuzi (cart) */
+function aBuy(){return dl('dlp',Object.values(P).map(p=>p.name))+dl('dls',SUP.map(s=>s.name))+`<div class="box"><h3>🛒 Manunuzi (cart)</h3>
+  <input list="dls" placeholder="Msambazaji (tafuta/chagua)" value="${esc(bsup)}" oninput="bsup=this.value"><input id="bp" list="dlp" placeholder="Bidhaa (tafuta/chagua)"><input id="bq" type="number" placeholder="Idadi"><input id="bk" type="number" placeholder="Bei ya kununua kwa kipande">
+  <button class="b" onclick="bAdd()">+ Weka kwenye cart</button>${bc.map((x,i)=>`<div class="row" style="padding:4px 0"><span>${esc(x.n)} ×${x.q} @${TZS(x.c)}</span><b class="sp">${TZS(x.q*x.c)}</b><button class="b d" onclick="bc.splice(${i},1);render()">✖</button></div>`).join('')}
+  <h3 style="text-align:right">Jumla: ${TZS(sum(bc,x=>x.q*x.c))}</h3><button class="b g" ${bc.length?'':'disabled'} onclick="bSave()">Kamilisha manunuzi</button></div>`+aMoney('purchases','Manunuzi mengine / historia')}
+function bAdd(){const p=byName(Object.values(P),$('#bp').value),q=parseInt($('#bq').value),c=Number($('#bk').value)||CST[p&&p.id]||0;if(!p||!(q>0))return alert('Chagua bidhaa na idadi');bc.push({id:p.id,n:p.name,q,c});render()}
+async function bSave(){const b=db.batch(),tot=sum(bc,x=>x.q*x.c);
+  bc.forEach(x=>{b.update(db.collection('products').doc(x.id),{stock:firebase.firestore.FieldValue.increment(x.q)});if(x.c>0)b.set(db.collection('costs').doc(x.id),{cost:x.c})});
+  b.set(db.collection('purchases').doc(),{name:'Stock: '+bc.map(x=>x.n+'×'+x.q).join(', '),items:bc,supplier:bsup,amount:tot,branch:me.branch||'',by:me.name,at:SV()});
+  try{await b.commit();bc=[];bsup='';render();toast('Manunuzi yamehifadhiwa, stock imeongezeka')}catch(e){alert(e.message)}}
+/* Uza (cart) -> inaenda kwa cashier */
+function aPos(){const ids=Object.keys(pos).filter(i=>P[i]),tot=sum(ids,i=>P[i].price*pos[i]);
+  const l=Object.values(P).filter(p=>p.active&&p.stock>0&&(!q||p.name.toLowerCase().includes(q.toLowerCase()))).sort((a,b)=>a.name.localeCompare(b.name));
+  return dl('dlc',CL().map(c=>c.name))+`<div class="box"><h3>🧾 Mauzo ya dukani (cart)</h3>${ids.map(i=>`<div class="row" style="padding:5px 0;border-bottom:1px solid #e3e9f0"><b>${esc(P[i].name)}</b><div class="sp row"><button class="b s" onclick="posQ('${i}',-1)">−</button><b>${pos[i]}</b><button class="b s" onclick="posQ('${i}',1)">+</button><b style="min-width:90px;text-align:right">${TZS(P[i].price*pos[i])}</b></div></div>`).join('')||'<p class="mu">Chagua bidhaa hapa chini.</p>'}
+  <h3 style="text-align:right">Jumla: ${TZS(tot)}</h3><input list="dlc" placeholder="Mteja (tafuta au andika jina jipya)" value="${esc(posN)}" oninput="posN=this.value">
+  <button class="b g" style="width:100%" ${ids.length?'':'disabled'} onclick="doPos()">Tuma oda kwa Cashier</button></div>
+  <input id="q" placeholder="🔍 Tafuta bidhaa..." value="${esc(q)}" oninput="q=this.value;render()">${l.map(p=>`<div class="box row" style="margin-bottom:6px"><div><b>${esc(p.name)}</b><div class="mu">${TZS(p.price)} · Stock ${p.stock}</div></div><button class="b sp" onclick="posQ('${p.id}',1)">+ Ongeza</button></div>`).join('')}`}
+async function doPos(){const ids=Object.keys(pos).filter(i=>pos[i]>0&&P[i]);if(!ids.length)return;
+  try{const nm=posN.trim();let c=byName(CL(),nm);if(nm&&!c){const r=await db.collection('customers').add({name:nm,phone:'',at:SV()});c={id:r.id,name:nm,phone:''}}
+  let no=0;const cref=db.collection('meta').doc('counter'),oref=db.collection('orders').doc();
+  await db.runTransaction(async t=>{const cs=await t.get(cref);no=(cs.exists?cs.data().n:1000)+1;const refs=ids.map(i=>db.collection('products').doc(i)),sn=await Promise.all(refs.map(r=>t.get(r))),items=[];
+    sn.forEach((s,k)=>{if(!s.exists)throw new Error('Bidhaa haipatikani');const p=s.data();if(p.stock<pos[ids[k]])throw new Error('"'+p.name+'" haitoshi');items.push({id:ids[k],name:p.name,price:p.price,qty:pos[ids[k]]})});
+    sn.forEach((s,k)=>t.update(refs[k],{stock:s.data().stock-pos[ids[k]]}));t.set(cref,{n:no});
+    t.set(oref,{no,uid:c?c.id:'walkin',cname:nm||'Mteja wa dukani',phone:c?c.phone:'',items,total:sum(items,i=>i.price*i.qty),method:'pickup',addr:'',note:'Mauzo ya dukani',status:'Confirmed',source:'pos',paid:0,payStatus:'awaiting',branch:me.branch||'',seller:me.name,at:SV()})});
+  pos={};posN='';render();toast('Oda #'+no+' imetumwa kwa cashier')}catch(e){alert(e.message)}}
+/* Review ya oda (ongeza / punguza / badili bidhaa) */
+function rvBox(){const o=allO.find(x=>x.id===rvId);if(!o)return'';
+  return dl('dlp',Object.values(P).map(p=>p.name))+`<div class="box" style="border:2px solid #0b2545"><b>✏ Review Oda #${o.no} · ${esc(o.cname)}</b>${o.items.map((i,k)=>`<div class="row" style="padding:4px 0"><span>${esc(i.name)} @${TZS(i.price)}</span><div class="sp row"><button class="b s" onclick="rvQ('${o.id}',${k},-1)">−</button><b>${i.qty}</b><button class="b s" onclick="rvQ('${o.id}',${k},1)">+</button><button class="b d" onclick="rvQ('${o.id}',${k},-9999)">✖</button></div></div>`).join('')}
+  <div class="row"><input id="rp" list="dlp" placeholder="Ongeza / badilisha bidhaa (tafuta)" style="flex:1;margin:0"><button class="b" onclick="rvAdd('${o.id}')">+ Ongeza</button></div><b>Jumla: ${TZS(o.total)}</b> <button class="b s" onclick="rvId=null;render()">Funga</button></div>`}
+async function rvEdit(oid,pid,d){try{await db.runTransaction(async t=>{const or=db.collection('orders').doc(oid),pr=db.collection('products').doc(pid),[os,ps]=await Promise.all([t.get(or),t.get(pr)]);
+  const o=os.data(),items=o.items.map(i=>({...i})),p=ps.data();if(o.status==='Cancelled')throw new Error('Oda imefutwa');let it=items.find(i=>i.id===pid);
+  if(!it){if(d<=0)return;it={id:pid,name:p.name,price:p.price,qty:0};items.push(it)}d=Math.max(d,-it.qty);if(d>p.stock)throw new Error('Stock haitoshi ('+p.stock+')');
+  it.qty+=d;const f=items.filter(i=>i.qty>0);if(!f.length)throw new Error('Oda lazima iwe na bidhaa. Tumia Cancel kuifuta.');
+  t.update(pr,{stock:p.stock-d});t.update(or,{items:f,total:sum(f,i=>i.price*i.qty)})})}catch(e){alert(e.message)}}
+const rvQ=(oid,k,d)=>rvEdit(oid,allO.find(x=>x.id===oid).items[k].id,d);
+function rvAdd(oid){const p=byName(Object.values(P),$('#rp').value);if(!p)return alert('Chagua bidhaa kwenye orodha');rvEdit(oid,p.id,1)}
+const _aO=aOrders,_aP=aPay;aOrders=()=>rvBox()+_aO();aPay=()=>rvBox()+_aP();
+/* Wafanyakazi: role */
+function setRole(id,r){Promise.all([db.collection('users').doc(id).update({role:r}),db.collection('employees').doc(id).update({role:r})]).then(()=>toast('Wadhifa umebadilishwa')).catch(e=>alert(e.message))}
+/* Akaunti yangu */
+function aMe(){return `<div class="box" style="text-align:center">${me.img?`<img src="${me.img}" style="width:110px;height:110px;border-radius:50%;object-fit:cover">`:'<div style="font-size:70px">👤</div>'}<div><button class="b s" onclick="chImgMe()">📷 Badili picha</button></div></div>
+  <div class="box"><h3>Akaunti yangu</h3><label class="mu">Jina</label><input id="u_n" value="${esc(me.name)}"><label class="mu">Simu</label><input id="u_p" value="${esc(me.phone||'')}">
+  <div class="mu">Email: ${esc(me.email||'')}<br>Wadhifa: <b>${esc(me.role)}</b><br>Tawi: ${esc(bn(me.branch))}<br>Unaweza kufikia: ${(isMgr()?['Zote']:(RT[me.role]||[]).map(t=>TL[t])).join(', ')}</div><button class="b g" onclick="saveMe()">Hifadhi</button></div>`}
+async function saveMe(){const d={name:$('#u_n').value.trim()||me.name,phone:$('#u_p').value.trim()};try{await db.collection('users').doc(me.id).update(d);Object.assign(me,d);toast('Imehifadhiwa');render()}catch(e){alert(e.message)}}
+function chImgMe(){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=async()=>{if(i.files[0]){const img=await resize(i.files[0]);try{await db.collection('users').doc(me.id).update({img});me.img=img;render()}catch(e){alert(e.message)}}};i.click()}
+/* Setting + taarifa za biashara (logo n.k.) */
+function aBiz(){const f=(id,l,v,t)=>`<label class="mu">${l}</label><input id="${id}" ${t?`type="${t}"`:''} value="${esc(v||'')}">`;
+  return `<div class="box"><h3>⚙ Setting / Taarifa za Biashara</h3><div style="text-align:center"><img id="lg" src="${BIZ.logo||'logo.png'}" style="max-height:90px"><div><button class="b s" onclick="pickLogo()">🖼 Badili logo</button></div></div>
+  ${f('b_n','Jina la biashara',BIZ.name||'LUKUBA SHOP')}${f('b_s','Kauli mbiu (slogan)',BIZ.slogan)}${f('b_p','Namba ya simu',BIZ.phone,'tel')}${f('b_a','Anwani / eneo',BIZ.address)}${f('b_e','Email / WhatsApp',BIZ.email)}${f('b_t','TIN / Namba ya usajili',BIZ.tin)}${f('b_w','Website / Instagram',BIZ.web)}${f('b_l','Kiwango cha stock kuonya (kengere)',BIZ.low||5,'number')}${f('b_f','Ujumbe wa chini ya risiti',BIZ.note)}
+  <label class="mu">Ujumbe unaosogea juu ya portal</label><textarea id="b_m" rows="3">${esc(BIZ.marquee||DEF_MQ)}</textarea><button class="b g" onclick="saveBiz()">Hifadhi</button></div>`}
+function pickLogo(){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=async()=>{if(i.files[0]){tmpLogo=await resize(i.files[0]);$('#lg').src=tmpLogo}};i.click()}
+async function saveBiz(){const g=i=>$('#'+i).value.trim(),d={name:g('b_n'),slogan:g('b_s'),phone:g('b_p'),address:g('b_a'),email:g('b_e'),tin:g('b_t'),web:g('b_w'),low:Number(g('b_l'))||5,note:g('b_f'),marquee:g('b_m')};if(tmpLogo)d.logo=tmpLogo;
+  try{await db.collection('settings').doc('biz').set(d,{merge:true});tmpLogo=null;toast('Setting zimehifadhiwa')}catch(e){alert('Imeshindwa: '+e.message)}}
 </script>
 </body>
 </html>
