@@ -4,11 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>LUKUBA SHOP</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b2545">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LUKUBA SHOP">
 <style>
 :root{--n:#0b2545;--t:#13a89e;--bg:#f2f5f9;--c:#fff;--tx:#17212f;--m:#6b7788;--r:#d64545;--ok:#1f9d55}
 *{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--tx)}
 header{background:var(--n);color:#fff;padding:10px 14px;position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-header b{font-size:18px;margin-right:auto}header button{background:transparent;color:#fff;border:1px solid #ffffff55;padding:6px 10px;border-radius:8px}
+header b{font-size:18px;margin-right:auto;display:flex;align-items:center}.lg{width:32px;height:32px;border-radius:8px;margin-right:8px;background:#fff}header button{background:transparent;color:#fff;border:1px solid #ffffff55;padding:6px 10px;border-radius:8px}
 header button.on{background:var(--t);border-color:var(--t)}
 main{max-width:1000px;margin:auto;padding:14px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
@@ -30,10 +37,18 @@ input,select,textarea{width:100%;padding:9px;border:1px solid #cdd5df;border-rad
 .st-Pending{background:#fff1cc}.st-Confirmed{background:#d6e8ff}.st-Processing{background:#e4dcff}.st-Delivered{background:#d9f3e4}.st-Cancelled{background:#fcdcdc}
 .st-Ready\ for\ Collection,.st-Out\ for\ Delivery{background:#d3f4f1}
 table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #e3e9f0;text-align:left;font-size:14px}
+.brand{background:#fff;text-align:center;padding:8px 8px 4px}.brand img{width:44%;max-width:170px;height:auto}
+.mq{background:var(--t);color:#fff;overflow:hidden;white-space:nowrap;padding:9px 0}
+.mq span{display:inline-block;padding-left:100%;font-weight:700;letter-spacing:.3px;animation:mq 20s linear infinite}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.stat{background:var(--c);border-radius:12px;padding:12px;box-shadow:0 1px 4px #0001}.stat b{display:block;font-size:17px;color:var(--n)}
+.edit{border:2px solid var(--t)}
 </style>
 </head>
 <body>
 <header id="hd"></header>
+<div id="bn"></div>
 <main id="app"></main>
 <div id="toast"></div>
 
@@ -55,11 +70,19 @@ const FIREBASE_CONFIG = {
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TZS = n => 'TSh ' + Number(n || 0).toLocaleString('en-US');
+const DEF_MQ = 'ASANTE KWA KUFANYA BIASHARA NASI KARIBU TENA LUKUBASHOP';
 const ST = ['Pending','Confirmed','Processing','Ready for Collection','Out for Delivery','Delivered','Cancelled'];
 const SW = {Pending:'Inasubiri','Confirmed':'Imethibitishwa',Processing:'Inaandaliwa','Ready for Collection':'Tayari kuchukuliwa','Out for Delivery':'Iko njiani (Delivery)',Delivered:'Imekamilika',Cancelled:'Imeghairiwa'};
 
-let db, auth, me = null, P = {}, cart = {}, myO = [], allO = [], view = 'shop', tab = 'orders', q = '', cat = '', ofilter = '', mode = 'login', regData = null, unsub = [], firstO = true;
+let CST = {}, BIZ = {}, editId = null, dip = null, db, auth, me = null, P = {}, cart = {}, myO = [], allO = [], view = 'shop', tab = 'orders', q = '', cat = '', ofilter = '', mode = 'login', regData = null, unsub = [], firstO = true;
 try { cart = JSON.parse(localStorage.getItem('lk_cart') || '{}'); } catch (e) {}
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); dip = e; render(); });
+window.addEventListener('appinstalled', () => { dip = null; render(); });
+function installApp() {
+  if (dip) { dip.prompt(); dip.userChoice.finally(() => { dip = null; render(); }); }
+  else alert('Android (Chrome): bonyeza ⋮ juu kulia, kisha "Add to Home screen" au "Install app".\n\niPhone (Safari): bonyeza kitufe cha Share, kisha "Add to Home Screen".');
+}
 const isStaff = () => me && ['boss','manager','cashier'].includes(me.role);
 const isMgr = () => me && ['boss','manager'].includes(me.role);
 const saveCart = () => { try { localStorage.setItem('lk_cart', JSON.stringify(cart)); } catch (e) {} };
@@ -80,7 +103,12 @@ if (FIREBASE_CONFIG.apiKey === 'WEKA_HAPA') {
 } else {
   firebase.initializeApp(FIREBASE_CONFIG);
   db = firebase.firestore(); auth = firebase.auth();
-  db.collection('products').onSnapshot(s => { P = {}; s.forEach(x => P[x.id] = { id: x.id, ...x.data() }); render(); });
+  db.collection('products').onSnapshot(s => {
+    P = {}; s.forEach(x => P[x.id] = { id: x.id, ...x.data() });
+    let ch = false; Object.keys(cart).forEach(k => { if (!P[k]) { delete cart[k]; ch = true; } }); if (ch) saveCart();
+    render();
+  });
+  db.collection('settings').doc('biz').onSnapshot(d => { BIZ = d.exists ? d.data() : {}; renderBanner(); render(); });
   auth.onAuthStateChanged(async u => {
     unsub.forEach(f => f()); unsub = []; myO = []; allO = []; firstO = true;
     if (!u) { me = null; render(); return; }
@@ -90,6 +118,7 @@ if (FIREBASE_CONFIG.apiKey === 'WEKA_HAPA') {
       await db.collection('users').doc(u.uid).set(nd); d = await db.collection('users').doc(u.uid).get();
     }
     me = { id: u.uid, ...d.data() };
+    if (isMgr()) unsub.push(db.collection('costs').onSnapshot(s => { CST = {}; s.forEach(x => CST[x.id] = Number(x.data().cost) || 0); render(); }));
     const col = db.collection('orders');
     const src = isStaff() ? col : col.where('uid', '==', u.uid);
     unsub.push(src.onSnapshot(s => {
@@ -109,11 +138,22 @@ if (FIREBASE_CONFIG.apiKey === 'WEKA_HAPA') {
   });
 }
 
+/* ---------- BANNER (logo + ujumbe unaosogea) ---------- */
+function renderBanner() {
+  const b = $('#bn'); if (!b) return;
+  const m = (BIZ.marquee && BIZ.marquee.trim()) || DEF_MQ;
+  b.innerHTML = `<div class="brand"><img src="logo.png" alt="LUKUBA SHOP"></div><div class="mq"><span style="animation-duration:${Math.max(14, Math.round(m.length * .35))}s">${esc(m)}</span></div>`;
+}
+function bizFooter() {
+  if (!(BIZ.phone || BIZ.address || BIZ.email)) return '';
+  return `<div class="box" style="margin-top:14px"><b>${esc(BIZ.name || 'LUKUBA SHOP')}</b>${BIZ.phone ? '<div>📞 ' + esc(BIZ.phone) + '</div>' : ''}${BIZ.address ? '<div>📍 ' + esc(BIZ.address) + '</div>' : ''}${BIZ.email ? '<div>✉️ ' + esc(BIZ.email) + '</div>' : ''}</div>`;
+}
+
 /* ---------- RENDER ---------- */
 function render() {
   if (!$('#app')) return;
   const nav = (v, t) => `<button class="${view === v ? 'on' : ''}" onclick="go('${v}')">${t}</button>`;
-  $('#hd').innerHTML = `<b>🛒 LUKUBA SHOP</b>${nav('shop', 'Bidhaa')}${nav('cart', 'Cart (' + cartCount() + ')')}` +
+  $('#hd').innerHTML = `<b><img class="lg" src="icon-192.png" alt="">${esc(BIZ.name || 'LUKUBA SHOP')}</b>${standalone ? '' : '<button onclick="installApp()">📲 Weka kwenye simu</button>'}${nav('shop', 'Bidhaa')}${nav('cart', 'Cart (' + cartCount() + ')')}` +
     (me ? (nav('orders', 'Oda zangu') + (isStaff() ? nav('admin', 'Usimamizi') : '') + `<button onclick="auth.signOut()">Toka</button>`) : nav('auth', 'Ingia'));
   const a = $('#app'), keep = document.activeElement?.id;
   a.innerHTML = { shop: vShop, cart: vCart, orders: vOrders, admin: vAdmin, auth: vAuth }[view]();
@@ -147,8 +187,8 @@ function vShop() {
   <div class="grid">${list.map(p => `<div class="card">${p.img ? `<img src="${p.img}" alt="">` : '<div class="ph">Hakuna picha</div>'}
   <div style="margin-top:6px"><b>${esc(p.name)}</b></div><div class="mu">${esc(p.desc || '')}</div>
   <div class="pr">${TZS(p.price)}</div>
-  <div style="margin:6px 0">${p.stock > 0 ? `<span class="tag in">Zilizopo: ${p.stock}</span>` : '<span class="tag oos">OUT OF STOCK</span>'}</div>
-  <button class="b" style="width:100%" ${p.stock > 0 ? '' : 'disabled'} onclick="addCart('${p.id}')">${p.stock > 0 ? 'Weka kwenye cart' : 'Imeisha'}</button></div>`).join('') || '<p class="mu">Hakuna bidhaa.</p>'}</div>`;
+  <div style="margin:6px 0">${p.stock > 0 ? `<span class="tag in">Ipo</span>` : '<span class="tag oos">OUT OF STOCK</span>'}</div>
+  <button class="b" style="width:100%" ${p.stock > 0 ? '' : 'disabled'} onclick="addCart('${p.id}')">${p.stock > 0 ? 'Weka kwenye cart' : 'Imeisha'}</button></div>`).join('') || '<p class="mu">Hakuna bidhaa.</p>'}</div>${bizFooter()}`;
 }
 function addCart(id) {
   const p = P[id]; if (!p || p.stock < 1) return;
@@ -164,7 +204,7 @@ function vCart() {
   const ids = Object.keys(cart).filter(i => P[i]);
   if (!ids.length) return '<div class="box">Cart yako ni tupu.</div>';
   const tot = ids.reduce((a, i) => a + P[i].price * cart[i], 0);
-  return `<div class="box">${ids.map(i => `<div class="row" style="padding:6px 0;border-bottom:1px solid #e3e9f0"><div><b>${esc(P[i].name)}</b><div class="mu">${TZS(P[i].price)}${P[i].stock < cart[i] || !P[i].active ? ' <span style="color:var(--r)">(stock haitoshi)</span>' : ''}</div></div>
+  return `<div class="box">${ids.map(i => `<div class="row" style="padding:6px 0;border-bottom:1px solid #e3e9f0"><div><b>${esc(P[i].name)}</b><div class="mu">${TZS(P[i].price)} · Zilizopo: ${P[i].stock}${P[i].stock < cart[i] || !P[i].active ? ' <span style="color:var(--r)">(stock haitoshi)</span>' : ''}</div></div>
   <div class="sp row"><button class="b s" onclick="chQty('${i}',-1)">−</button><b>${cart[i]}</b><button class="b s" onclick="chQty('${i}',1)">+</button><b style="min-width:100px;text-align:right">${TZS(P[i].price * cart[i])}</b></div></div>`).join('')}
   <h3 style="text-align:right">Jumla: ${TZS(tot)}</h3>
   ${me ? `<select id="m" onchange="$('#adw').style.display=this.value==='delivery'?'block':'none'"><option value="pickup">Nitajichukulia dukani</option><option value="delivery">Naomba delivery</option></select>
@@ -211,11 +251,37 @@ function oCard(o, staff) {
   <div class="mu">${o.method === 'delivery' ? '🚚 Delivery: ' + esc(o.addr) : '🏪 Kuchukua dukani'}${o.note ? ' · ' + esc(o.note) : ''}</div>
   <table>${o.items.map(i => `<tr><td>${esc(i.name)}</td><td>${i.qty} × ${TZS(i.price)}</td><td>${TZS(i.qty * i.price)}</td></tr>`).join('')}</table>
   <h4 style="text-align:right;margin:6px 0">Jumla: ${TZS(o.total)}</h4>
+  <div class="row" style="margin-bottom:8px"><button class="b s" onclick="printReceipt('${o.id}')">🖨 Print Risiti</button></div>
   ${staff && !['Cancelled', 'Delivered'].includes(o.status) ? (o.status === 'Pending'
     ? `<div class="row"><button class="b g" onclick="setSt('${o.id}','Confirmed')">✔ Kubali</button><button class="b d" onclick="setSt('${o.id}','Cancelled')">✖ Kataa</button></div>`
     : `<div class="row"><select id="s${o.id}" style="max-width:240px;margin:0">${nx.map(s => `<option>${s}</option>`).join('')}</select><button class="b" onclick="setSt('${o.id}',$('#s${o.id}').value)">Badilisha hali</button></div>`) : ''}</div>`;
 }
 function vOrders() { return myO.length ? myO.map(o => oCard(o, false)).join('') : '<div class="box">Bado hujafanya oda.</div>'; }
+
+function printReceipt(id) {
+  const o = [...myO, ...allO].find(x => x.id === id); if (!o) return;
+  const d = o.at && o.at.toDate ? o.at.toDate().toLocaleString('sw-TZ') : '';
+  let logo = 'logo.png'; try { logo = new URL('logo.png', location.href).href; } catch (e) {}
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Risiti #${o.no}</title><style>
+  body{font:14px Arial,sans-serif;max-width:380px;margin:0 auto;padding:12px;color:#000}.c{text-align:center}h2,h3{margin:4px 0}
+  table{width:100%;border-collapse:collapse;margin:8px 0}td,th{padding:4px 2px;font-size:13px;text-align:left}th:last-child,td:last-child{text-align:right}
+  .t{border-top:2px dashed #000;border-bottom:2px dashed #000;padding:6px 0;font-weight:700;font-size:16px;display:flex;justify-content:space-between}
+  hr{border:0;border-top:1px dashed #000}img{width:130px}</style></head><body>
+  <div class="c"><img src="${logo}" alt=""><h2>${esc(BIZ.name || 'LUKUBA SHOP')}</h2>
+  ${BIZ.phone ? '<div>Simu: ' + esc(BIZ.phone) + '</div>' : ''}${BIZ.address ? '<div>' + esc(BIZ.address) + '</div>' : ''}${BIZ.email ? '<div>' + esc(BIZ.email) + '</div>' : ''}</div><hr>
+  <h3 class="c">RISITI YA ODA #${o.no}</h3>
+  <div>Tarehe: ${esc(d)}</div><div>Mteja: ${esc(o.cname)}</div>${o.phone ? '<div>Simu: ' + esc(o.phone) + '</div>' : ''}
+  <div>${o.method === 'delivery' ? 'Delivery: ' + esc(o.addr) : 'Kuchukua dukani'}</div><div>Hali: ${esc(SW[o.status] || o.status)}</div><hr>
+  <table><tr><th>Bidhaa</th><th>Idadi</th><th>Bei</th><th>Jumla</th></tr>
+  ${o.items.map(i => `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${Number(i.price).toLocaleString('en-US')}</td><td>${(i.qty * i.price).toLocaleString('en-US')}</td></tr>`).join('')}</table>
+  <div class="t"><span>JUMLA</span><span>${TZS(o.total)}</span></div>
+  <p class="c">${esc(BIZ.note || 'Asante kwa kufanya biashara nasi. Karibu tena!')}</p></body></html>`;
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  f.contentDocument.open(); f.contentDocument.write(html); f.contentDocument.close();
+  setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { alert('Imeshindwa kufungua print.'); } setTimeout(() => f.remove(), 3000); }, 700);
+}
 
 async function setSt(id, st) {
   if (st === 'Cancelled' && !confirm('Kuikataa/kuighairi oda kutarudisha stock. Endelea?')) return;
@@ -236,9 +302,9 @@ async function setSt(id, st) {
 /* ---------- ADMIN ---------- */
 function vAdmin() {
   if (!isStaff()) return '<div class="box">Huna ruhusa.</div>';
-  const tabs = [['orders', 'Oda']].concat(isMgr() ? [['prod', 'Bidhaa'], ['cust', 'Wateja'], ['top', 'Zinazouzwa zaidi']] : []);
+  const tabs = [['orders', 'Oda']].concat(isMgr() ? [['prod', 'Bidhaa'], ['cust', 'Wateja'], ['top', 'Zinazouzwa zaidi'], ['biz', 'Taarifa za Biashara']] : []);
   return `<div class="row" style="margin-bottom:10px">${tabs.map(t => `<button class="b ${tab === t[0] ? '' : 's'}" onclick="tab='${t[0]}';render()">${t[1]}</button>`).join('')}</div>` +
-    ({ orders: aOrders, prod: aProd, cust: aCust, top: aTop }[tab] || aOrders)();
+    ({ orders: aOrders, prod: aProd, cust: aCust, top: aTop, biz: aBiz }[tab] || aOrders)();
 }
 function aOrders() {
   const l = allO.filter(o => !ofilter || o.status === ofilter);
@@ -247,14 +313,68 @@ function aOrders() {
 }
 function aProd() {
   const l = Object.values(P).sort((a, b) => a.name.localeCompare(b.name));
-  return `<div class="box"><h3>Ongeza bidhaa</h3><input id="pn" placeholder="Jina la bidhaa"><input id="pc" placeholder="Category"><input id="pd" placeholder="Maelezo">
-  <div class="row"><input id="pp" type="number" placeholder="Bei (TSh)" style="flex:1"><input id="ps" type="number" placeholder="Stock" style="flex:1"></div>
+  let inv = 0, val = 0, nocost = 0;
+  l.forEach(p => { const st = Number(p.stock) || 0; val += st * (Number(p.price) || 0); if (CST[p.id] > 0) inv += st * CST[p.id]; else nocost++; });
+  const stats = `<div class="stats"><div class="stat"><span class="mu">Jumla ya Uwekezaji</span><b>${TZS(inv)}</b></div>
+  <div class="stat"><span class="mu">Thamani ya mauzo (stock)</span><b>${TZS(val)}</b></div>
+  <div class="stat"><span class="mu">Faida inayotarajiwa</span><b>${TZS(inv ? val - inv : 0)}</b></div>
+  <div class="stat"><span class="mu">Bidhaa</span><b>${l.length}</b></div></div>
+  ${nocost ? `<p class="mu">Bidhaa ${nocost} hazina bei ya kununua, hazijahesabiwa kwenye uwekezaji. Bonyeza Hariri kuiweka.</p>` : ''}`;
+  const e = editId && P[editId];
+  const editBox = e ? `<div class="box edit"><h3>Hariri: ${esc(e.name)}</h3>
+  <input id="e_n" placeholder="Jina la bidhaa" value="${esc(e.name)}"><input id="e_c" placeholder="Category" value="${esc(e.category || '')}"><input id="e_d" placeholder="Maelezo" value="${esc(e.desc || '')}">
+  <div class="row"><input id="e_p" type="number" placeholder="Bei ya kuuza" value="${e.price}" style="flex:1"><input id="e_k" type="number" placeholder="Bei ya kununua" value="${CST[e.id] || ''}" style="flex:1"></div>
+  <input id="e_s" type="number" placeholder="Idadi (stock)" value="${e.stock}">
+  ${e.img ? `<img src="${e.img}" style="width:70px;height:70px;object-fit:cover;border-radius:8px"><div class="mu">Chagua picha mpya kubadilisha</div>` : ''}
+  <input id="e_i" type="file" accept="image/*">
+  <label class="row"><input id="e_a" type="checkbox" style="width:auto" ${e.active ? 'checked' : ''}> Onyesha kwa wateja</label>
+  <div class="row"><button class="b g" id="eb" onclick="saveEdit()">Hifadhi mabadiliko</button><button class="b s" onclick="editId=null;render()">Ghairi</button></div></div>` : '';
+  return stats + editBox + `<div class="box"><h3>Ongeza bidhaa</h3><input id="pn" placeholder="Jina la bidhaa"><input id="pc" placeholder="Category"><input id="pd" placeholder="Maelezo">
+  <div class="row"><input id="pp" type="number" placeholder="Bei ya kuuza" style="flex:1"><input id="pk" type="number" placeholder="Bei ya kununua" style="flex:1"></div>
+  <input id="ps" type="number" placeholder="Idadi (stock)">
   <input id="pi" type="file" accept="image/*"><button class="b" id="sb" onclick="addProd()">Hifadhi bidhaa</button></div>` +
     l.map(p => `<div class="box row">${p.img ? `<img src="${p.img}" style="width:60px;height:60px;object-fit:cover;border-radius:8px">` : ''}
-    <div><b>${esc(p.name)}</b> ${p.active ? '' : '<span class="tag oos">Imeondolewa</span>'}<div class="mu">${esc(p.category || '')} · ${TZS(p.price)} · Stock: ${p.stock}</div></div>
-    <div class="sp row"><button class="b s" onclick="chPrice('${p.id}')">Bei</button><button class="b s" onclick="addStock('${p.id}')">+ Stock</button>
-    <button class="b s" onclick="chImg('${p.id}')">Picha</button>
-    <button class="b ${p.active ? 'd' : 'g'}" onclick="db.collection('products').doc('${p.id}').update({active:${!p.active}})">${p.active ? 'Ondoa' : 'Rudisha'}</button></div></div>`).join('');
+    <div><b>${esc(p.name)}</b> ${p.active ? '' : '<span class="tag oos">Imefichwa</span>'}<div class="mu">${esc(p.category || '')} · Kuuza ${TZS(p.price)}${CST[p.id] ? ' · Kununua ' + TZS(CST[p.id]) : ''} · Stock: ${p.stock}</div></div>
+    <div class="sp row"><button class="b s" onclick="editId='${p.id}';render();scrollTo(0,0)">Hariri</button><button class="b s" onclick="addStock('${p.id}')">+ Stock</button>
+    <button class="b d" onclick="delProd('${p.id}')">Futa</button></div></div>`).join('');
+}
+async function saveEdit() {
+  const id = editId, n = $('#e_n').value.trim(), pr = Number($('#e_p').value), st = parseInt($('#e_s').value), co = Number($('#e_k').value || 0);
+  if (!n || !(pr >= 0) || !(st >= 0)) return alert('Jaza jina, bei na idadi kwa usahihi');
+  $('#eb').disabled = true;
+  try {
+    const d = { name: n, category: $('#e_c').value.trim(), desc: $('#e_d').value.trim(), price: pr, stock: st, active: $('#e_a').checked };
+    const f = $('#e_i').files[0]; if (f) d.img = await resize(f);
+    await db.collection('products').doc(id).update(d);
+    if (co > 0) await db.collection('costs').doc(id).set({ cost: co }); else await db.collection('costs').doc(id).delete();
+    editId = null; render(); toast('Mabadiliko yamehifadhiwa');
+  } catch (e) { alert('Imeshindwa: ' + e.message); const b = $('#eb'); if (b) b.disabled = false; }
+}
+async function delProd(id) {
+  const p = P[id]; if (!p) return;
+  if (!confirm('Futa "' + p.name + '" kabisa? Itaondoka kwenye portal na haitarudi.')) return;
+  try {
+    await db.collection('products').doc(id).delete();
+    try { await db.collection('costs').doc(id).delete(); } catch (e) {}
+    if (editId === id) editId = null; toast('Bidhaa imefutwa kabisa');
+  } catch (e) { alert('Imeshindwa kufuta: ' + e.message); }
+}
+function aBiz() {
+  return `<div class="box"><h3>Taarifa za Biashara</h3>
+  <label class="mu">Jina la biashara</label><input id="b_n" value="${esc(BIZ.name || 'LUKUBA SHOP')}">
+  <label class="mu">Namba ya simu</label><input id="b_p" type="tel" value="${esc(BIZ.phone || '')}">
+  <label class="mu">Anwani / eneo</label><input id="b_a" value="${esc(BIZ.address || '')}">
+  <label class="mu">Email / WhatsApp</label><input id="b_e" value="${esc(BIZ.email || '')}">
+  <label class="mu">Ujumbe wa chini ya risiti</label><input id="b_f" value="${esc(BIZ.note || '')}" placeholder="Asante kwa kufanya biashara nasi. Karibu tena!">
+  <label class="mu">Ujumbe unaosogea juu ya portal</label><textarea id="b_m" rows="3">${esc(BIZ.marquee || DEF_MQ)}</textarea>
+  <button class="b g" onclick="saveBiz()">Hifadhi</button></div>`;
+}
+async function saveBiz() {
+  try {
+    await db.collection('settings').doc('biz').set({ name: $('#b_n').value.trim(), phone: $('#b_p').value.trim(), address: $('#b_a').value.trim(),
+      email: $('#b_e').value.trim(), note: $('#b_f').value.trim(), marquee: $('#b_m').value.trim() }, { merge: true });
+    toast('Taarifa zimehifadhiwa');
+  } catch (e) { alert('Imeshindwa kuhifadhi: ' + e.message); }
 }
 function resize(file) {
   return new Promise((res, rej) => {
@@ -265,12 +385,15 @@ function resize(file) {
   });
 }
 async function addProd() {
-  const n = $('#pn').value.trim(), pr = Number($('#pp').value), st = parseInt($('#ps').value || '0');
+  const n = $('#pn').value.trim(), pr = Number($('#pp').value), st = parseInt($('#ps').value || '0'), co = Number($('#pk').value || 0);
   if (!n || !(pr >= 0) || !(st >= 0)) return alert('Jaza jina, bei na stock kwa usahihi');
   $('#sb').disabled = true;
-  const f = $('#pi').files[0];
-  await db.collection('products').add({ name: n, category: $('#pc').value.trim(), desc: $('#pd').value.trim(), price: pr, stock: st, active: true, img: f ? await resize(f) : '' });
-  toast('Bidhaa imehifadhiwa');
+  try {
+    const f = $('#pi').files[0];
+    const ref = await db.collection('products').add({ name: n, category: $('#pc').value.trim(), desc: $('#pd').value.trim(), price: pr, stock: st, active: true, img: f ? await resize(f) : '' });
+    if (co > 0) await db.collection('costs').doc(ref.id).set({ cost: co });
+    toast('Bidhaa imehifadhiwa');
+  } catch (e) { alert('Imeshindwa: ' + e.message); const b = $('#sb'); if (b) b.disabled = false; }
 }
 function chPrice(id) { const v = prompt('Bei mpya (TSh):', P[id].price); if (v !== null && Number(v) >= 0 && v !== '') db.collection('products').doc(id).update({ price: Number(v) }); }
 function addStock(id) { const v = parseInt(prompt('Ongeza stock kiasi gani? (mf. 30)', '')); if (v) db.collection('products').doc(id).update({ stock: firebase.firestore.FieldValue.increment(v) }); }
@@ -290,7 +413,8 @@ function aTop() {
   const l = Object.values(m).sort((a, b) => b.q - a.q);
   return `<div class="box"><table><tr><th>Bidhaa</th><th>Zilizouzwa</th><th>Mapato</th></tr>${l.map(x => `<tr><td>${esc(x.n)}</td><td>${x.q}</td><td>${TZS(x.t)}</td></tr>`).join('') || '<tr><td colspan=3>Hakuna bado</td></tr>'}</table></div>`;
 }
-document.addEventListener('DOMContentLoaded', render);
+document.addEventListener('DOMContentLoaded', () => { renderBanner(); render(); });
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 </script>
 </body>
 </html>
