@@ -266,10 +266,10 @@ function printReceipt(id) {
   let logo = 'logo.png'; try { logo = new URL('logo.png', location.href).href; } catch (e) {}
   if (BIZ.logo) logo = BIZ.logo;
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>Risiti #${o.no}</title><style>
-  body{font:14px Arial,sans-serif;max-width:${szW()};margin:0 auto;padding:12px;color:#000}.c{text-align:center}h2,h3{margin:4px 0}
+  *{box-sizing:border-box}html,body{margin:0;padding:0}body{font:12px Arial,sans-serif;width:${szW()};max-width:100%;margin:0 auto;padding:3mm;color:#000;overflow-wrap:anywhere}.c{text-align:center}h2,h3{margin:3px 0}
   table{width:100%;border-collapse:collapse;margin:8px 0}td,th{padding:4px 2px;font-size:13px;text-align:left}th:last-child,td:last-child{text-align:right}
   .t{border-top:2px dashed #000;border-bottom:2px dashed #000;padding:6px 0;font-weight:700;font-size:16px;display:flex;justify-content:space-between}
-  @page{size:${szPg()};margin:4mm}hr{border:0;border-top:1px dashed #000}img{width:130px}</style></head><body>
+  @page{size:${szPg()};margin:0}hr{border:0;border-top:1px dashed #000;margin:5px 0}img{width:30mm;max-width:100%;height:auto}table{table-layout:fixed}td,th{font-size:10px;word-break:break-word;padding:3px 1px}@media print{html,body{width:${szW()};margin:0!important;padding:0!important}.receipt{padding:3mm}}</style></head><body>
   <div class="c"><img src="${logo}" alt=""><h2>${esc(BIZ.name || 'LUKUBA SHOP')}</h2>
   ${BIZ.phone ? '<div>Simu: ' + esc(BIZ.phone) + '</div>' : ''}${BIZ.address ? '<div>' + esc(BIZ.address) + '</div>' : ''}${BIZ.email ? '<div>' + esc(BIZ.email) + '</div>' : ''}</div><hr>
   <h3 class="c">RISITI YA ODA #${o.no}</h3>
@@ -426,7 +426,7 @@ sum=(a,f)=>a.reduce((s,x)=>s+(Number(f(x))||0),0),dbt=o=>Math.max(0,(o.total||0)
 PL={day:'Leo',month:'Mwezi huu',year:'Mwaka huu'},fd=d=>d.toLocaleDateString('sw-TZ'),SV=()=>firebase.firestore.FieldValue.serverTimestamp(),
 inP=(d,p)=>{const n=new Date();return d.getFullYear()===n.getFullYear()&&(p==='year'||(d.getMonth()===n.getMonth()&&(p==='month'||d.getDate()===n.getDate())))},
 bf=a=>a.filter(x=>!bsel||x.branch===bsel),live=()=>bf(allO).filter(o=>!['Cancelled','Pending'].includes(o.status)),
-SZW={58:'220px',80:'380px',A5:'520px',A4:'720px'},SZP={58:'58mm auto',80:'80mm auto',A5:'A5',A4:'A4'};
+SZW={58:'52mm',80:'72mm',A5:'138mm',A4:'200mm'},SZP={58:'58mm auto',80:'80mm auto',A5:'A5',A4:'A4'};
 const szW=()=>SZW[psz],szPg=()=>SZP[psz];
 function subExtra(){
   if(!isStaff())return;
@@ -530,6 +530,10 @@ async function paySal(id){const l=id?[EMP[id]]:Object.values(EMP).filter(e=>owed
   const b=db.batch();l.forEach(e=>b.set(db.collection('salaryPays').doc(),{eid:e.id,name:e.name,amount:amt[e.id],branch:e.branch||'',by:me.name,at:SV()}));
   try{await b.commit();toast('Mishahara imelipwa')}catch(x){alert(x.message)}}
 async function editSal(id){const r=await askIn('Mshahara mpya kwa mwezi (TSh):',EMP[id].salary),v=Number(r);if(r!==null&&r!==''&&v>=0)db.collection('employees').doc(id).update({salary:v}).then(()=>toast('Mshahara umebadilishwa')).catch(e=>alert(e.message))}
+async function editSalaryPay(id){const p=SPAY.find(x=>x.id===id);if(!p)return;
+  const r=await formModal('Hariri rekodi ya malipo ya mshahara',[{k:'name',l:'Jina la mfanyakazi',v:p.name},{k:'amount',l:'Kiasi kilicholipwa (TSh)',v:p.amount,t:'number'}]);
+  if(!r)return;if(!r.name||!(r.amount>0))return alert('Jaza jina na kiasi sahihi');
+  try{await db.collection('salaryPays').doc(id).update(r);toast('Rekodi ya malipo ya mshahara imebadilishwa')}catch(e){alert(e.message)}}
 /* --- Wafanyakazi (akaunti) --- */
 function aStaff(){const bo=Object.values(BR).map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join('');
   return `<div class="box"><h3>Ongeza mfanyakazi (akaunti)</h3><input id="f_n" placeholder="Jina kamili (ndilo jina la kuingia)"><input id="f_p" type="tel" placeholder="Simu"><input id="f_w" type="password" placeholder="Password (herufi 6+)">
@@ -727,19 +731,21 @@ function logAct(m){if(!me)return;db.collection('activity').add({by:me.name||'',r
 const _toast=toast;toast=function(m){_toast(m);if(/imehifadhiwa|imeundwa|imefutwa|Malipo|Mauzo|Deni|imetumwa|imepunguzwa|imelipwa|imepokelewa|Mabadiliko|Wadhifa|imezimwa|ameongezwa|imeongezwa|imebadilishwa|Setting/.test(m)&&!/^Oda mpya|^Oda #\d+: /.test(m)&&!(view==='shop'&&/imeongezwa$/.test(m)))logAct(m)};
 
 /* ===== Print: kila risiti ichapishwe peke yake (si ukurasa mzima) ===== */
-function printDoc(html){const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
-  f.contentDocument.open();f.contentDocument.write(html);f.contentDocument.close();
-  setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){alert('Imeshindwa kufungua print.')}setTimeout(()=>f.remove(),4000)},800)}
+function printDoc(html){const f=document.createElement('iframe');f.title='Hati ya kuchapisha';f.style.cssText='position:fixed;left:0;top:0;width:1px;height:1px;opacity:0;border:0;pointer-events:none';document.body.appendChild(f);
+  const w=f.contentWindow,d=f.contentDocument;d.open();d.write(html);d.close();
+  const go=()=>{try{w.focus();w.print()}catch(e){alert('Imeshindwa kufungua print.')}};
+  const imgs=[...d.images];Promise.all(imgs.map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=i.onerror=r}))).then(()=>setTimeout(go,250));
+  w.onafterprint=()=>setTimeout(()=>f.remove(),500);setTimeout(()=>{if(f.isConnected)f.remove()},60000)}
 function printCust(n){n=String(n||'').trim();if(!n)return alert('Chagua mteja kwenye orodha');
   const L=allO.filter(o=>o.status!=='Cancelled'&&String(o.cname||'').toLowerCase()===n.toLowerCase()).sort((a,b)=>a.no-b.no);
   if(!L.length)return alert('Mteja "'+n+'" hana oda.');
   const T=sum(L,o=>o.total),pd=sum(L,o=>o.payStatus==='done'?o.paid:0),dd=sum(L,o=>o.payStatus==='done'?dbt(o):0),wt=sum(L,o=>o.payStatus==='done'?0:o.total),ph=(L.find(o=>o.phone)||{}).phone||'',
   logo=BIZ.logo||new URL('logo.png',location.href).href,N=x=>Number(x).toLocaleString('en-US'),row=(a,b)=>`<div style="display:flex;justify-content:space-between"><span>${a}</span><span>${b}</span></div>`;
   printDoc(`<!doctype html><html><head><meta charset="utf-8"><title>Risiti ya mteja</title><style>
-  body{font:14px Arial,sans-serif;max-width:${szW()};margin:0 auto;padding:12px;color:#000}.c{text-align:center}h2,h3{margin:4px 0}
+  *{box-sizing:border-box}html,body{margin:0;padding:0}body{font:12px Arial,sans-serif;width:${szW()};max-width:100%;margin:0 auto;padding:3mm;color:#000;overflow-wrap:anywhere}.c{text-align:center}h2,h3{margin:3px 0}
   table{width:100%;border-collapse:collapse;margin:8px 0}td,th{padding:4px 2px;font-size:13px;text-align:left}th:last-child,td:last-child{text-align:right}td.g{text-align:left!important;border-top:1px dashed #000;padding-top:6px}
   .t{border-top:2px dashed #000;border-bottom:2px dashed #000;padding:6px 0;font-weight:700;font-size:16px;display:flex;justify-content:space-between}
-  @page{size:${szPg()};margin:4mm}hr{border:0;border-top:1px dashed #000}img{width:130px}</style></head><body>
+  @page{size:${szPg()};margin:0}hr{border:0;border-top:1px dashed #000;margin:5px 0}img{width:30mm;max-width:100%;height:auto}table{table-layout:fixed}td,th{font-size:10px;word-break:break-word;padding:3px 1px}@media print{html,body{width:${szW()};margin:0!important;padding:0!important}}</style></head><body>
   <div class="c"><img src="${logo}" alt=""><h2>${esc(BIZ.name||'LUKUBA SHOP')}</h2>
   ${BIZ.phone?'<div>Simu: '+esc(BIZ.phone)+'</div>':''}${BIZ.address?'<div>'+esc(BIZ.address)+'</div>':''}${BIZ.email?'<div>'+esc(BIZ.email)+'</div>':''}</div><hr>
   <h3 class="c">RISITI YA MTEJA</h3>
@@ -781,6 +787,11 @@ async function editMoney(c,id){const e=(c==='expenses'?EXP:PUR).find(x=>x.id===i
 async function changePw(){const a=$('#pw1').value,b=$('#pw2').value;if(a.length<6)return alert('Password iwe herufi 6 au zaidi');if(a!==b)return alert('Password hazilingani');
   try{await auth.currentUser.updatePassword(a);clr(['pw1','pw2']);toast('Password imebadilishwa')}catch(e){alert(e.code==='auth/requires-recent-login'?'Toka (Logout) kisha ingia tena, halafu jaribu kubadilisha password.':e.message)}}
 aMe=(o=>()=>o()+`<div class="box"><h3>🔑 Badilisha password</h3><input id="pw1" type="password" placeholder="Password mpya (herufi 6+)" autocomplete="new-password"><input id="pw2" type="password" placeholder="Rudia password mpya" autocomplete="new-password"><button class="b g" onclick="changePw()">Hifadhi password</button></div>`)(aMe);
+
+/* Historia ya mishahara: rekodi zilizohifadhiwa zinaweza kuhaririwa */
+aSal=(old=>()=>old()+`<div class="box"><h3>Historia ya malipo ya mishahara</h3>
+<table><tr><th>Tarehe</th><th>Mfanyakazi</th><th>Kiasi</th><th></th></tr>
+${SPAY.filter(p=>!bsel||p.branch===bsel).sort((a,b)=>dt(b)-dt(a)).slice(0,100).map(p=>`<tr><td>${fd(dt(p))}</td><td>${esc(p.name)}</td><td>${TZS(p.amount)}</td><td><button class="b s" onclick="editSalaryPay('${p.id}')">✏ Hariri</button></td></tr>`).join('')||'<tr><td colspan="4">Hakuna malipo yaliyorekodiwa.</td></tr>'}</table></div>`)(aSal);
 </script>
 </body>
 </html>
