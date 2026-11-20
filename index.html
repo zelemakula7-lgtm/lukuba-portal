@@ -731,9 +731,20 @@ function logAct(m){if(!me)return;db.collection('activity').add({by:me.name||'',r
 const _toast=toast;toast=function(m){_toast(m);if(/imehifadhiwa|imeundwa|imefutwa|Malipo|Mauzo|Deni|imetumwa|imepunguzwa|imelipwa|imepokelewa|Mabadiliko|Wadhifa|imezimwa|ameongezwa|imeongezwa|imebadilishwa|Setting/.test(m)&&!/^Oda mpya|^Oda #\d+: /.test(m)&&!(view==='shop'&&/imeongezwa$/.test(m)))logAct(m)};
 
 /* ===== Print: kila risiti ichapishwe peke yake (si ukurasa mzima) ===== */
-function printDoc(html){const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
-  f.contentDocument.open();f.contentDocument.write(html);f.contentDocument.close();
-  setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){alert('Imeshindwa kufungua print.')}setTimeout(()=>f.remove(),3000)},700)}
+function printDoc(html){
+  const bar='<div class="np" style="position:sticky;top:0;background:#0b2545;padding:8px;text-align:center"><button onclick="print()" style="padding:8px 14px;font-size:15px">🖨 Print</button> <button onclick="close()" style="padding:8px 14px;font-size:15px">Funga</button></div><style>@media print{.np{display:none!important}}</style>';
+  const w=window.open('','_blank');
+  if(!w){return overlayPrint(html)}
+  w.document.open();w.document.write(html.replace('<body>','<body>'+bar));w.document.close();
+  const im=[...w.document.images],ok=Promise.all(im.map(i=>i.complete?1:new Promise(r=>{i.onload=i.onerror=r})));
+  Promise.race([ok,new Promise(r=>setTimeout(r,3000))]).then(()=>setTimeout(()=>{try{w.focus();w.print()}catch(e){}},300))}
+function overlayPrint(html){const d=new DOMParser().parseFromString(html,'text/html');let css=[...d.querySelectorAll('style')].map(x=>x.textContent).join('').replace(/body\{/g,'#prt{');
+  const pg=(css.match(/@page\{[^}]*\}/)||[''])[0];css=css.replace(pg,'');
+  document.querySelectorAll('#prt,#prts').forEach(x=>x.remove());
+  const st=document.createElement('style');st.id='prts';st.textContent='#prt{display:none}@media print{body>*:not(#prt){display:none!important}#prt{display:block!important}'+css+'}'+pg;
+  const p=document.createElement('div');p.id='prt';p.innerHTML=d.body.innerHTML;document.head.appendChild(st);document.body.appendChild(p);
+  const clean=()=>{p.remove();st.remove()};addEventListener('afterprint',clean,{once:true});
+  setTimeout(()=>{try{print()}catch(e){alert('Imeshindwa kufungua print.');clean()}},700)}
 function printCust(n){n=String(n||'').trim();if(!n)return alert('Chagua mteja kwenye orodha');
   const L=allO.filter(o=>o.status!=='Cancelled'&&String(o.cname||'').toLowerCase()===n.toLowerCase()).sort((a,b)=>a.no-b.no);
   if(!L.length)return alert('Mteja "'+n+'" hana oda.');
