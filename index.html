@@ -734,12 +734,20 @@ function printCust(n){n=String(n||'').trim();if(!n)return alert('Chagua mteja kw
   const L=allO.filter(o=>o.status!=='Cancelled'&&String(o.cname||'').toLowerCase()===n.toLowerCase()).sort((a,b)=>a.no-b.no);
   if(!L.length)return alert('Mteja "'+n+'" hana oda.');
   const T=sum(L,o=>o.total),pd=sum(L,o=>o.payStatus==='done'?o.paid:0),dd=sum(L,o=>o.payStatus==='done'?dbt(o):0),wt=sum(L,o=>o.payStatus==='done'?0:o.total),ph=(L.find(o=>o.phone)||{}).phone||'',
-  logo=BIZ.logo||new URL('logo.png',location.href).href,N=x=>Number(x).toLocaleString('en-US');
-  printDoc(`<!doctype html><html><head><style>body{font:14px Arial,sans-serif;max-width:${szW()};margin:0 auto;padding:12px;color:#000}.c{text-align:center}table{width:100%;border-collapse:collapse;margin:6px 0}td,th{padding:3px 2px;font-size:12px;text-align:left;border-bottom:1px dashed #999}td.r,th.r{text-align:right}.t{display:flex;justify-content:space-between;font-weight:700}@page{size:${szPg()};margin:4mm}img{width:110px}</style></head><body>
-  <div class="c"><img src="${logo}" alt=""><h3>${esc(BIZ.name||'LUKUBA SHOP')}</h3>${BIZ.phone?'<div>Simu: '+esc(BIZ.phone)+'</div>':''}</div><hr>
-  <h3 class="c">RISITI YA MTEJA</h3><div>Mteja: <b>${esc(L[0].cname)}</b></div>${ph?'<div>Simu: '+esc(ph)+'</div>':''}<div>Tarehe: ${fd(new Date())}</div>
-  <table><tr><th>Oda</th><th>Bidhaa</th><th class="r">Jumla</th></tr>${L.map(o=>`<tr><td>#${o.no}<br>${fd(dt(o))}</td><td>${o.items.map(i=>esc(i.name)+' ×'+i.qty).join(', ')}</td><td class="r">${N(o.total)}</td></tr>`).join('')}</table>
-  <div class="t"><span>JUMLA</span><span>${TZS(T)}</span></div><div class="t"><span>Amelipa</span><span>${TZS(pd)}</span></div>${wt?'<div class="t"><span>Inasubiri malipo</span><span>'+TZS(wt)+'</span></div>':''}<div class="t"><span>DENI</span><span>${TZS(dd)}</span></div>
+  logo=BIZ.logo||new URL('logo.png',location.href).href,N=x=>Number(x).toLocaleString('en-US'),row=(a,b)=>`<div style="display:flex;justify-content:space-between"><span>${a}</span><span>${b}</span></div>`;
+  printDoc(`<!doctype html><html><head><meta charset="utf-8"><title>Risiti ya mteja</title><style>
+  body{font:14px Arial,sans-serif;max-width:${szW()};margin:0 auto;padding:12px;color:#000}.c{text-align:center}h2,h3{margin:4px 0}
+  table{width:100%;border-collapse:collapse;margin:8px 0}td,th{padding:4px 2px;font-size:13px;text-align:left}th:last-child,td:last-child{text-align:right}td.g{text-align:left!important;border-top:1px dashed #000;padding-top:6px}
+  .t{border-top:2px dashed #000;border-bottom:2px dashed #000;padding:6px 0;font-weight:700;font-size:16px;display:flex;justify-content:space-between}
+  @page{size:${szPg()};margin:4mm}hr{border:0;border-top:1px dashed #000}img{width:130px}</style></head><body>
+  <div class="c"><img src="${logo}" alt=""><h2>${esc(BIZ.name||'LUKUBA SHOP')}</h2>
+  ${BIZ.phone?'<div>Simu: '+esc(BIZ.phone)+'</div>':''}${BIZ.address?'<div>'+esc(BIZ.address)+'</div>':''}${BIZ.email?'<div>'+esc(BIZ.email)+'</div>':''}</div><hr>
+  <h3 class="c">RISITI YA MTEJA</h3>
+  <div>Tarehe: ${fd(new Date())}</div><div>Mteja: ${esc(L[0].cname)}</div>${ph?'<div>Simu: '+esc(ph)+'</div>':''}<div>Idadi ya oda: ${L.length}</div><hr>
+  <table><tr><th>Bidhaa</th><th>Idadi</th><th>Bei</th><th>Jumla</th></tr>
+  ${L.map(o=>`<tr><td class="g" colspan="4"><b>Oda #${o.no}</b> · ${fd(dt(o))}</td></tr>`+o.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${N(i.price)}</td><td>${N(i.qty*i.price)}</td></tr>`).join('')).join('')}</table>
+  <div class="t"><span>JUMLA</span><span>${TZS(T)}</span></div>
+  ${row('Amelipa',TZS(pd))}${wt?row('Inasubiri malipo',TZS(wt)):''}${dd?row('<b>DENI</b>','<b>'+TZS(dd)+'</b>'):''}
   <p class="c">${esc(BIZ.note||'Asante kwa kufanya biashara nasi. Karibu tena!')}</p></body></html>`)}
 aCust=(o=>()=>`<div class="box"><h3>🖨 Risiti ya mteja mmoja</h3><input id="pcn" data-cb="cust" placeholder="Tafuta/chagua mteja"><button class="b" onclick="printCust($('#pcn').value)">Print risiti ya mteja</button></div>`+o())(aCust);
 
