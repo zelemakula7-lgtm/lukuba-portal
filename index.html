@@ -516,7 +516,7 @@ async function addStock(id){const v=parseInt(await askIn('Ongeza stock kiasi gan
 function aMoney(c,t){const A=bf(c==='expenses'?EXP:PUR).sort((a,b)=>dt(b)-dt(a)),s=p=>TZS(sum(A.filter(x=>inP(dt(x),p)),x=>x.amount));
   return `<div class="box"><h3>Ongeza ${t}</h3><input id="m_n" placeholder="Maelezo"><input id="m_a" type="number" placeholder="Kiasi (TSh)"><button class="b" onclick="addMoney('${c}')">Hifadhi</button></div>
   <div class="stats"><div class="stat"><span class="mu">Leo</span><b>${s('day')}</b></div><div class="stat"><span class="mu">Mwezi</span><b>${s('month')}</b></div><div class="stat"><span class="mu">Mwaka</span><b>${s('year')}</b></div></div>
-  <div class="box"><table><tr><th>Tarehe</th><th>Maelezo</th><th>Kiasi</th><th></th></tr>${A.slice(0,100).map(x=>`<tr><td>${fd(dt(x))}</td><td>${esc(x.name)}<div class="mu">${esc(bn(x.branch))}</div></td><td>${TZS(x.amount)}</td><td><button class="b d" onclick="delDoc('${c}','${x.id}')">✖</button></td></tr>`).join('')}</table></div>`}
+  <div class="box"><table><tr><th>Tarehe</th><th>Maelezo</th><th>Kiasi</th><th></th></tr>${A.slice(0,100).map(x=>`<tr><td>${fd(dt(x))}</td><td>${esc(x.name)}<div class="mu">${esc(bn(x.branch))}</div></td><td>${TZS(x.amount)}</td><td><button class="b s" onclick="editMoney('${c}','${x.id}')">✏</button> <button class="b d" onclick="delDoc('${c}','${x.id}')">✖</button></td></tr>`).join('')}</table></div>`}
 async function addMoney(c){const n=$('#m_n').value.trim(),a=Number($('#m_a').value);if(!n||!(a>0))return alert('Jaza maelezo na kiasi');
   try{await db.collection(c).add({name:n,amount:a,branch:me.branch||'',by:me.name,at:SV()});clr(['m_n','m_a']);toast('Imehifadhiwa: '+n+' - '+TZS(a))}catch(e){alert(e.message)}}
 async function delDoc(c,id){if(await ask('Futa rekodi hii?'))db.collection(c).doc(id).delete().then(()=>toast('Rekodi imefutwa')).catch(e=>alert(e.message))}
@@ -535,12 +535,12 @@ function aStaff(){const bo=Object.values(BR).map(b=>`<option value="${b.id}">${e
   return `<div class="box"><h3>Ongeza mfanyakazi (akaunti)</h3><input id="f_n" placeholder="Jina kamili (ndilo jina la kuingia)"><input id="f_p" type="tel" placeholder="Simu"><input id="f_w" type="password" placeholder="Password (herufi 6+)">
   <select id="f_r"><option value="cashier">Cashier</option><option value="sales">Sales</option><option value="driver">Driver</option><option value="operator">Operator</option>${me.role==='boss'?'<option value="manager">Manager</option>':''}</select><select id="f_b"><option value="">Tawi: hakuna</option>${bo}</select>
   <input id="f_s" type="number" placeholder="Mshahara kwa mwezi (TSh)"><label class="mu">Anaanza mshahara mwezi:</label><input id="f_m" type="month" value="${new Date().toISOString().slice(0,7)}"><button class="b" id="f_btn" onclick="addStaff()">Tengeneza akaunti</button></div>`+
-  Object.values(EMP).map(e=>`<div class="box row"><div><b>${esc(e.name)}</b> <select onchange="setRole('${e.id}',this.value)" style="width:auto;margin:0">${ROLES.map(r=>`<option ${r===e.role?'selected':''}>${r}</option>`).join('')}</select><div class="mu">${esc(e.phone||'')} · Tawi: ${esc(bn(e.branch))}</div></div><button class="b d sp" onclick="delStaff('${e.id}')">Zima</button></div>`).join('')}
+  Object.values(EMP).map(e=>`<div class="box row"><div><b>${esc(e.name)}</b> <select onchange="setRole('${e.id}',this.value)" style="width:auto;margin:0">${ROLES.map(r=>`<option ${r===e.role?'selected':''}>${r}</option>`).join('')}</select><div class="mu">${esc(e.phone||'')} · Tawi: ${esc(bn(e.branch))}</div></div><div class="sp row"><button class="b s" onclick="editEmp('${e.id}')">✏ Hariri</button><button class="b d" onclick="delStaff('${e.id}')">Zima</button></div></div>`).join('')}
 async function delStaff(id){if(!await ask('Zima akaunti hii? Hataweza tena kutumia usimamizi.'))return;
   try{await db.collection('users').doc(id).update({role:'customer'});await db.collection('employees').doc(id).delete();toast('Akaunti imezimwa')}catch(e){alert(e.message)}}
 /* --- Matawi --- */
 function aBr(){return `<div class="box"><h3>Ongeza tawi</h3><input id="br_n" placeholder="Jina la tawi"><input id="br_a" placeholder="Anwani / eneo"><button class="b" onclick="addBr()">Hifadhi tawi</button></div>`+
-  Object.values(BR).map(b=>`<div class="box row"><div><b>${esc(b.name)}</b><div class="mu">${esc(b.addr||'')}</div></div><button class="b d sp" onclick="delDoc('branches','${b.id}')">Futa</button></div>`).join('')}
+  Object.values(BR).map(b=>`<div class="box row"><div><b>${esc(b.name)}</b><div class="mu">${esc(b.addr||'')}</div></div><div class="sp row"><button class="b s" onclick="editBr('${b.id}')">✏ Hariri</button><button class="b d" onclick="delDoc('branches','${b.id}')">Futa</button></div></div>`).join('')}
 async function addBr(){const n=$('#br_n').value.trim();if(!n)return alert('Andika jina la tawi');
   try{await db.collection('branches').add({name:n,addr:$('#br_a').value.trim()});clr(['br_n','br_a']);toast('Tawi limeongezwa: '+n)}catch(e){alert(e.message)}}
 /* --- Ripoti --- */
@@ -580,12 +580,12 @@ function vAdmin(){
 function aCust(){const ord={};allO.filter(o=>o.status!=='Cancelled').forEach(o=>{const c=ord[o.uid]=ord[o.uid]||{c:0,t:0};c.c++;c.t+=o.total});
   const l=[...UC.map(u=>({...u,k:'📱 Mtandaoni'})),...CU.map(u=>({...u,k:'🏪 Dukani'}))].filter(c=>!q||(c.name+(c.phone||'')).toLowerCase().includes(q.toLowerCase()));
   return `<div class="box"><h3>Ongeza mteja (dukani)</h3><input id="c_n" placeholder="Jina"><input id="c_p" type="tel" placeholder="Simu (si lazima)"><button class="b" onclick="addCus()">Hifadhi</button></div>
-  <input id="q" placeholder="🔍 Tafuta mteja..." value="${esc(q)}" oninput="q=this.value;render()"><div class="box"><table><tr><th>Mteja</th><th>Aina</th><th>Oda</th><th>Jumla</th></tr>${l.map(c=>`<tr><td>${esc(c.name)}<div class="mu">${esc(c.phone||'Hana simu')}</div></td><td>${c.k}</td><td>${(ord[c.id]||{c:0}).c}</td><td>${TZS((ord[c.id]||{t:0}).t)}</td></tr>`).join('')||'<tr><td colspan=4>Hakuna</td></tr>'}</table></div>`}
+  <input id="q" placeholder="🔍 Tafuta mteja..." value="${esc(q)}" oninput="q=this.value;render()"><div class="box"><table><tr><th>Mteja</th><th>Aina</th><th>Oda</th><th>Jumla</th><th></th></tr>${l.map(c=>`<tr><td>${esc(c.name)}<div class="mu">${esc(c.phone||'Hana simu')}</div></td><td>${c.k}</td><td>${(ord[c.id]||{c:0}).c}</td><td>${TZS((ord[c.id]||{t:0}).t)}</td><td style="white-space:nowrap"><button class="b s" onclick="editCus('${c.id}','${c.k.includes('Duka')?'customers':'users'}')">✏</button> <button class="b s" data-n="${esc(c.name)}" onclick="printCust(this.dataset.n)">🖨</button></td></tr>`).join('')||'<tr><td colspan=4>Hakuna</td></tr>'}</table></div>`}
 async function addCus(){const n=$('#c_n').value.trim();if(!n)return alert('Andika jina');if(byName(CL(),n))return alert('Mteja huyu yupo tayari');
   try{await db.collection('customers').add({name:n,phone:$('#c_p').value.trim(),at:SV()});clr(['c_n','c_p']);toast('Mteja ameongezwa: '+n)}catch(e){alert(e.message)}}
 /* Supplies */
 function aSup(){return `<div class="box"><h3>Ongeza msambazaji</h3><input id="s_n" placeholder="Jina"><input id="s_p" type="tel" placeholder="Simu"><input id="s_a" placeholder="Anwani / bidhaa anazouza"><button class="b" onclick="addSup()">Hifadhi</button></div>`+
-  SUP.map(s=>`<div class="box row"><div><b>${esc(s.name)}</b><div class="mu">${esc(s.phone||'')} · ${esc(s.addr||'')}</div><div class="mu">Manunuzi: ${TZS(sum(PUR.filter(p=>p.supplier===s.name),p=>p.amount))}</div></div><button class="b d sp" onclick="delDoc('suppliers','${s.id}')">Futa</button></div>`).join('')}
+  SUP.map(s=>`<div class="box row"><div><b>${esc(s.name)}</b><div class="mu">${esc(s.phone||'')} · ${esc(s.addr||'')}</div><div class="mu">Manunuzi: ${TZS(sum(PUR.filter(p=>p.supplier===s.name),p=>p.amount))}</div></div><div class="sp row"><button class="b s" onclick="editSup('${s.id}')">✏ Hariri</button><button class="b d" onclick="delDoc('suppliers','${s.id}')">Futa</button></div></div>`).join('')}
 async function addSup(){const n=$('#s_n').value.trim();if(!n)return alert('Andika jina');try{await db.collection('suppliers').add({name:n,phone:$('#s_p').value.trim(),addr:$('#s_a').value.trim()});clr(['s_n','s_p','s_a']);toast('Msambazaji ameongezwa: '+n)}catch(e){alert(e.message)}}
 /* Manunuzi (cart) */
 function aBuy(){return dl('dlp',Object.values(P).map(p=>p.name))+dl('dls',SUP.map(s=>s.name))+`<div class="box"><h3>🛒 Manunuzi (cart)</h3>
@@ -727,13 +727,9 @@ function logAct(m){if(!me)return;db.collection('activity').add({by:me.name||'',r
 const _toast=toast;toast=function(m){_toast(m);if(/imehifadhiwa|imeundwa|imefutwa|Malipo|Mauzo|Deni|imetumwa|imepunguzwa|imelipwa|imepokelewa|Mabadiliko|Wadhifa|imezimwa|ameongezwa|imeongezwa|imebadilishwa|Setting/.test(m)&&!/^Oda mpya|^Oda #\d+: /.test(m)&&!(view==='shop'&&/imeongezwa$/.test(m)))logAct(m)};
 
 /* ===== Print: kila risiti ichapishwe peke yake (si ukurasa mzima) ===== */
-function printDoc(html){const d=new DOMParser().parseFromString(html,'text/html');let css=[...d.querySelectorAll('style')].map(x=>x.textContent).join('').replace(/body\{/g,'#prt{');
-  const pg=(css.match(/@page\{[^}]*\}/)||[''])[0];css=css.replace(pg,'');
-  document.querySelectorAll('#prt,#prts').forEach(x=>x.remove());
-  const st=document.createElement('style');st.id='prts';st.textContent='#prt{display:none}@media print{body>*:not(#prt){display:none!important}#prt{display:block!important}'+css+'}'+pg;
-  const p=document.createElement('div');p.id='prt';p.innerHTML=d.body.innerHTML;document.head.appendChild(st);document.body.appendChild(p);
-  const clean=()=>{p.remove();st.remove()};addEventListener('afterprint',clean,{once:true});
-  setTimeout(()=>{try{print()}catch(e){alert('Imeshindwa kufungua print.');clean()}},600)}
+function printDoc(html){const f=document.createElement('iframe');f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
+  f.contentDocument.open();f.contentDocument.write(html);f.contentDocument.close();
+  setTimeout(()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(e){alert('Imeshindwa kufungua print.')}setTimeout(()=>f.remove(),4000)},800)}
 function printCust(n){n=String(n||'').trim();if(!n)return alert('Chagua mteja kwenye orodha');
   const L=allO.filter(o=>o.status!=='Cancelled'&&String(o.cname||'').toLowerCase()===n.toLowerCase()).sort((a,b)=>a.no-b.no);
   if(!L.length)return alert('Mteja "'+n+'" hana oda.');
@@ -746,6 +742,37 @@ function printCust(n){n=String(n||'').trim();if(!n)return alert('Chagua mteja kw
   <div class="t"><span>JUMLA</span><span>${TZS(T)}</span></div><div class="t"><span>Amelipa</span><span>${TZS(pd)}</span></div>${wt?'<div class="t"><span>Inasubiri malipo</span><span>'+TZS(wt)+'</span></div>':''}<div class="t"><span>DENI</span><span>${TZS(dd)}</span></div>
   <p class="c">${esc(BIZ.note||'Asante kwa kufanya biashara nasi. Karibu tena!')}</p></body></html>`)}
 aCust=(o=>()=>`<div class="box"><h3>🖨 Risiti ya mteja mmoja</h3><input id="pcn" data-cb="cust" placeholder="Tafuta/chagua mteja"><button class="b" onclick="printCust($('#pcn').value)">Print risiti ya mteja</button></div>`+o())(aCust);
+
+/* ===== Hariri taarifa (wafanyakazi, wasambazaji, wateja, matawi, manunuzi/matumizi) + password ===== */
+function formModal(title,F){return new Promise(res=>{const o=document.createElement('div');o.id='mdl';
+  o.innerHTML=`<div class="m" style="max-height:90vh;overflow:auto"><b>${esc(title)}</b>${F.map((f,i)=>`<label class="mu">${esc(f.l)}</label>${f.o?`<select id="fm${i}">${f.o.map(x=>`<option value="${esc(x[0])}" ${x[0]===f.v?'selected':''}>${esc(x[1])}</option>`).join('')}</select>`:`<input id="fm${i}" type="${f.t||'text'}" value="${esc(f.v??'')}">`}`).join('')}<div class="row" style="justify-content:flex-end"><button class="b s" data-x="0">Ghairi</button><button class="b g" data-x="1">Hifadhi</button></div></div>`;
+  document.body.appendChild(o);
+  o.onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.x==='0'){o.remove();res(null)}else{const r={};F.forEach((f,i)=>{const v=o.querySelector('#fm'+i).value.trim();r[f.k]=f.t==='number'?Number(v)||0:v});o.remove();res(r)}}})}
+async function editEmp(id){const e=EMP[id];if(!e)return;
+  const r=await formModal('Hariri mfanyakazi',[{k:'name',l:'Jina',v:e.name},{k:'phone',l:'Simu',v:e.phone||'',t:'tel'},{k:'salary',l:'Mshahara kwa mwezi (TSh)',v:e.salary||0,t:'number'},{k:'start',l:'Anaanza mshahara mwezi',v:e.start||'',t:'month'},{k:'branch',l:'Tawi',v:e.branch||'',o:[['','Hakuna'],...Object.values(BR).map(b=>[b.id,b.name])]}]);
+  if(!r)return;if(!r.name)return alert('Andika jina');
+  try{const b=db.batch();b.update(db.collection('users').doc(id),{name:r.name,phone:r.phone,branch:r.branch});b.update(db.collection('employees').doc(id),r);await b.commit();toast('Taarifa za '+r.name+' zimebadilishwa')}catch(x){alert(x.message)}}
+async function editSup(id){const e=SUP.find(x=>x.id===id);if(!e)return;
+  const r=await formModal('Hariri msambazaji',[{k:'name',l:'Jina',v:e.name},{k:'phone',l:'Simu',v:e.phone||'',t:'tel'},{k:'addr',l:'Anwani / bidhaa anazouza',v:e.addr||''}]);
+  if(!r)return;if(!r.name)return alert('Andika jina');
+  if(r.name.toLowerCase()!==e.name.toLowerCase()&&byName(SUP,r.name))return alert('Jina hili lipo tayari');
+  try{await db.collection('suppliers').doc(id).update(r);toast('Taarifa za msambazaji zimebadilishwa')}catch(x){alert(x.message)}}
+async function editCus(id,coll){const e=(coll==='users'?UC:CU).find(x=>x.id===id);if(!e)return;
+  const r=await formModal('Hariri mteja',[{k:'name',l:'Jina',v:e.name},{k:'phone',l:'Simu',v:e.phone||'',t:'tel'}]);
+  if(!r)return;if(!r.name)return alert('Andika jina');
+  const d=byName(CL(),r.name);if(d&&d.id!==id)return alert('Mteja mwenye jina hili yupo tayari');
+  try{await db.collection(coll).doc(id).update(r);toast('Taarifa za mteja zimebadilishwa')}catch(x){alert(x.message)}}
+async function editBr(id){const e=BR[id];if(!e)return;
+  const r=await formModal('Hariri tawi',[{k:'name',l:'Jina la tawi',v:e.name},{k:'addr',l:'Anwani / eneo',v:e.addr||''}]);
+  if(!r)return;if(!r.name)return alert('Andika jina');
+  try{await db.collection('branches').doc(id).update(r);toast('Tawi limebadilishwa')}catch(x){alert(x.message)}}
+async function editMoney(c,id){const e=(c==='expenses'?EXP:PUR).find(x=>x.id===id);if(!e)return;
+  const r=await formModal('Hariri rekodi',[{k:'name',l:'Maelezo',v:e.name},{k:'amount',l:'Kiasi (TSh)',v:e.amount,t:'number'}]);
+  if(!r)return;if(!r.name||!(r.amount>0))return alert('Jaza maelezo na kiasi');
+  try{await db.collection(c).doc(id).update(r);toast('Rekodi imebadilishwa')}catch(x){alert(x.message)}}
+async function changePw(){const a=$('#pw1').value,b=$('#pw2').value;if(a.length<6)return alert('Password iwe herufi 6 au zaidi');if(a!==b)return alert('Password hazilingani');
+  try{await auth.currentUser.updatePassword(a);clr(['pw1','pw2']);toast('Password imebadilishwa')}catch(e){alert(e.code==='auth/requires-recent-login'?'Toka (Logout) kisha ingia tena, halafu jaribu kubadilisha password.':e.message)}}
+aMe=(o=>()=>o()+`<div class="box"><h3>🔑 Badilisha password</h3><input id="pw1" type="password" placeholder="Password mpya (herufi 6+)" autocomplete="new-password"><input id="pw2" type="password" placeholder="Rudia password mpya" autocomplete="new-password"><button class="b g" onclick="changePw()">Hifadhi password</button></div>`)(aMe);
 </script>
 </body>
 </html>
