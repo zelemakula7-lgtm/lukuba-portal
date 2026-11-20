@@ -1,16 +1,31 @@
 {
   "name": "LUKUBA SHOP",
   "short_name": "LUKUBA",
-  "description": "Nunua bidhaa za LUKUBA SHOP ukiwa nyumbani",
-  "start_url": "./",
+  "description": "LUKUBA SHOP - Duka na Usimamizi",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "lang": "sw",
-  "theme_color": "#0b2545",
   "background_color": "#ffffff",
+  "theme_color": "#0b2545",
   "icons": [
-    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
-    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
