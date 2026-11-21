@@ -12,9 +12,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="LUKUBA SHOP">
 <style>
-:root{--n:#0b2545;--t:#13a89e;--bg:#f2f5f9;--c:#fff;--tx:#17212f;--m:#6b7788;--r:#d64545;--ok:#1f9d55}
-*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg);color:var(--tx)}
-header{background:var(--n);color:#fff;padding:10px 14px;position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+:root{--n:#0b2545;--t:#13a89e;--bg:color-mix(in srgb,var(--t) 7%,#f2f5f9);--tl:color-mix(in srgb,var(--t) 20%,#fff);--ns:color-mix(in srgb,var(--n) 10%,#fff);--c:#fff;--tx:#17212f;--m:#6b7788;--r:#d64545;--ok:#1f9d55}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--bg,#f2f5f9);color:var(--tx)}
+header{background:var(--n);background:linear-gradient(135deg,var(--n),color-mix(in srgb,var(--n) 62%,var(--t)));color:#fff;padding:10px 14px;position:sticky;top:0;z-index:5;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 header b{font-size:18px;margin-right:auto;display:flex;align-items:center}.lg{width:32px;height:32px;border-radius:8px;margin-right:8px;background:#fff}header button{background:transparent;color:#fff;border:1px solid #ffffff55;padding:6px 10px;border-radius:8px}
 header button.on{background:var(--t);border-color:var(--t)}
 main{max-width:1000px;margin:auto;padding:14px}
@@ -25,9 +25,9 @@ main{max-width:1000px;margin:auto;padding:14px}
 .pr{color:var(--n);font-weight:700}.mu{color:var(--m);font-size:13px}
 button,input,select,textarea{font:inherit}
 .b{background:var(--t);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
-.b.s{background:#e6ebf1;color:var(--tx)}.b.d{background:var(--r)}.b.g{background:var(--ok)}.b:disabled{opacity:.45;cursor:not-allowed}
+.b.s{background:var(--ns,#e6ebf1);color:var(--tx)}.b.d{background:var(--r)}.b.g{background:var(--ok)}.b:disabled{opacity:.45;cursor:not-allowed}
 input,select,textarea{width:100%;padding:9px;border:1px solid #cdd5df;border-radius:8px;margin:4px 0 8px;background:#fff}
-.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:700;background:#e6ebf1}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:700;background:var(--ns,#e6ebf1)}
 .oos{background:var(--r);color:#fff}.in{background:#d9f3e4;color:#14703c}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sp{margin-left:auto}
 .box{background:var(--c);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px #0001}
@@ -35,7 +35,7 @@ input,select,textarea{width:100%;padding:9px;border:1px solid #cdd5df;border-rad
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:9}
 #toast div{background:var(--n);color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 2px 8px #0005}
 .st-Pending{background:#fff1cc}.st-Confirmed{background:#d6e8ff}.st-Processing{background:#e4dcff}.st-Delivered{background:#d9f3e4}.st-Cancelled{background:#fcdcdc}
-.st-Ready\ for\ Collection,.st-Out\ for\ Delivery{background:#d3f4f1}
+.st-Ready\ for\ Collection,.st-Out\ for\ Delivery{background:var(--tl,#d3f4f1)}
 table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #e3e9f0;text-align:left;font-size:14px}
 .brand{background:#fff;text-align:center;padding:8px 8px 4px}.brand img{width:44%;max-width:170px;height:auto}
 .mq{background:var(--t);color:#fff;overflow:hidden;white-space:nowrap;padding:9px 0}
@@ -44,6 +44,9 @@ table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px so
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
 .stat{background:var(--c);border-radius:12px;padding:12px;box-shadow:0 1px 4px #0001}.stat b{display:block;font-size:17px;color:var(--n)}
 .edit{border:2px solid var(--t)}
+.box h3{color:var(--n)}.box{border-top:3px solid color-mix(in srgb,var(--t) 55%,#fff)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--t);border-color:var(--t)}
+.pt th{color:var(--n)}a{color:var(--t)}
 </style>
 </head>
 <body>
@@ -618,7 +621,7 @@ async function doPos(){const ids=Object.keys(pos).filter(i=>pos[i]>0&&P[i]);if(!
   pos={};posN='';clrcb('cust');render();toast('Oda #'+no+' imetumwa kwa cashier')}catch(e){alert(e.message)}}
 /* Review ya oda (ongeza / punguza / badili bidhaa) */
 function rvBox(){const o=allO.find(x=>x.id===rvId);if(!o)return'';
-  return dl('dlp',Object.values(P).map(p=>p.name))+`<div class="box" style="border:2px solid #0b2545"><b>✏ Review Oda #${o.no} · ${esc(o.cname)}</b>${o.items.map((i,k)=>`<div class="row" style="padding:4px 0"><span>${esc(i.name)} @${TZS(i.price)}</span><div class="sp row"><button class="b s" onclick="rvQ('${o.id}',${k},-1)">−</button><b>${i.qty}</b><button class="b s" onclick="rvQ('${o.id}',${k},1)">+</button><button class="b d" onclick="rvQ('${o.id}',${k},-9999)">✖</button></div></div>`).join('')}
+  return dl('dlp',Object.values(P).map(p=>p.name))+`<div class="box" style="border:2px solid var(--n)"><b>✏ Review Oda #${o.no} · ${esc(o.cname)}</b>${o.items.map((i,k)=>`<div class="row" style="padding:4px 0"><span>${esc(i.name)} @${TZS(i.price)}</span><div class="sp row"><button class="b s" onclick="rvQ('${o.id}',${k},-1)">−</button><b>${i.qty}</b><button class="b s" onclick="rvQ('${o.id}',${k},1)">+</button><button class="b d" onclick="rvQ('${o.id}',${k},-9999)">✖</button></div></div>`).join('')}
   <div class="row"><input id="rp" list="dlp" placeholder="Ongeza / badilisha bidhaa (tafuta)" style="flex:1;margin:0"><button class="b" onclick="rvAdd('${o.id}')">+ Ongeza</button></div><b>Jumla: ${TZS(o.total)}</b> <button class="b s" onclick="rvId=null;render()">Funga</button></div>`}
 async function rvEdit(oid,pid,d){try{await db.runTransaction(async t=>{const or=db.collection('orders').doc(oid),pr=db.collection('products').doc(pid),[os,ps]=await Promise.all([t.get(or),t.get(pr)]);
   const o=os.data(),items=o.items.map(i=>({...i})),p=ps.data();if(o.status==='Cancelled')throw new Error('Oda imefutwa');let it=items.find(i=>i.id===pid);
@@ -647,7 +650,7 @@ async function saveBiz(){const g=i=>$('#'+i).value.trim(),d={name:g('b_n'),sloga
 </script>
 <style>
 #cbp{position:fixed;display:none;z-index:50;background:#fff;border:1px solid #cdd5df;border-radius:10px;box-shadow:0 6px 20px #0003;max-height:40vh;overflow:auto}
-#cbp div{padding:9px 11px;border-bottom:1px solid #eef1f5;cursor:pointer}#cbp div.on,#cbp div:hover{background:#d3f4f1}#cbp span{color:var(--m);font-size:12px;margin-left:6px}#cbp .no{color:var(--m);cursor:default}
+#cbp div{padding:9px 11px;border-bottom:1px solid #eef1f5;cursor:pointer}#cbp div.on,#cbp div:hover{background:var(--tl,#d3f4f1)}#cbp span{color:var(--m);font-size:12px;margin-left:6px}#cbp .no{color:var(--m);cursor:default}
 #mdl{position:fixed;inset:0;background:#0007;z-index:99;display:flex;align-items:center;justify-content:center;padding:16px}#mdl .m{background:#fff;border-radius:14px;padding:16px;max-width:420px;width:100%;box-shadow:0 8px 30px #0006}#mdl p{margin:0 0 10px;white-space:pre-wrap;line-height:1.4}
 #off{position:fixed;top:0;left:0;right:0;background:var(--r);color:#fff;text-align:center;padding:4px;z-index:98;font-size:13px}
 </style>
@@ -803,9 +806,9 @@ aSal=(old=>()=>old()+`<div class="box"><h3>Historia ya malipo ya mishahara</h3>
 ${SPAY.filter(p=>!bsel||p.branch===bsel).sort((a,b)=>dt(b)-dt(a)).slice(0,100).map(p=>`<tr><td>${fd(dt(p))}</td><td>${esc(p.name)}</td><td>${TZS(p.amount)}</td><td><button class="b s" onclick="editSalaryPay('${p.id}')">✏ Hariri</button></td></tr>`).join('')||'<tr><td colspan="4">Hakuna malipo yaliyorekodiwa.</td></tr>'}</table></div>`)(aSal);
 
 /* ===== Profile ya mfanyakazi, Lock ya dakika 5, na Payroll ya kitaalamu ===== */
-document.head.insertAdjacentHTML('beforeend','<style>#lock{position:fixed;inset:0;background:#0b2545;z-index:150;display:flex;align-items:center;justify-content:center;padding:16px}#lock .m{background:#fff;border-radius:14px;padding:20px;max-width:380px;width:100%}.pk{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0}.pk>div{background:#f6f8fb;border-radius:10px;padding:10px}.pk small{display:block;color:#5b6b7c;font-size:11px;text-transform:uppercase}.pk b{font-size:19px}.pt{border-collapse:collapse;width:100%}.pt th,.pt td{white-space:nowrap;padding:7px 8px;text-align:right;border-bottom:1px solid #e3e8ef}.pt th{background:#f1f4f8;font-size:11px;text-transform:uppercase}.pt .l{text-align:left}.pt tr.tt td{font-weight:700;background:#f6f8fb}</style>');
+document.head.insertAdjacentHTML('beforeend','<style>#lock{position:fixed;inset:0;background:var(--n);z-index:150;display:flex;align-items:center;justify-content:center;padding:16px}#lock .m{background:#fff;border-radius:14px;padding:20px;max-width:380px;width:100%}.pk{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0}.pk>div{background:#f6f8fb;border-radius:10px;padding:10px}.pk small{display:block;color:#5b6b7c;font-size:11px;text-transform:uppercase}.pk b{font-size:19px}.pt{border-collapse:collapse;width:100%}.pt th,.pt td{white-space:nowrap;padding:7px 8px;text-align:right;border-bottom:1px solid #e3e8ef}.pt th{background:#f1f4f8;font-size:11px;text-transform:uppercase}.pt .l{text-align:left}.pt tr.tt td{font-weight:700;background:#f6f8fb}</style>');
 const RLB={boss:'Mmiliki (Boss)',manager:'Meneja',cashier:'Cashier',sales:'Mauzo (Sales)',driver:'Dereva',operator:'Operator (Bidhaa/Manunuzi)'},
-avatar=(u,z)=>u&&u.img?`<img src="${u.img}" style="width:${z}px;height:${z}px;border-radius:50%;object-fit:cover;vertical-align:middle">`:`<span style="width:${z}px;height:${z}px;border-radius:50%;background:#0b2545;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:${Math.round(z/2.3)}px;font-weight:700;vertical-align:middle">${esc(((u&&u.name)||'?').trim().slice(0,1).toUpperCase())}</span>`,
+avatar=(u,z)=>u&&u.img?`<img src="${u.img}" style="width:${z}px;height:${z}px;border-radius:50%;object-fit:cover;vertical-align:middle">`:`<span style="width:${z}px;height:${z}px;border-radius:50%;background:var(--n);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:${Math.round(z/2.3)}px;font-weight:700;vertical-align:middle">${esc(((u&&u.name)||'?').trim().slice(0,1).toUpperCase())}</span>`,
 whoLine=u=>esc(u.title||RLB[u.role]||u.role||'')+(u.branch?' · '+esc(bn(u.branch)):'');
 const _enh=enhance;enhance=function(){_enh();const A=$('#app');
   if(A&&me&&isStaff()&&view==='admin'&&!A.querySelector('#who'))A.insertAdjacentHTML('afterbegin',`<div class="box" id="who" style="display:flex;align-items:center;gap:12px">${avatar(me,56)}<div><b style="font-size:17px">${esc(me.name)}</b><div class="mu">${whoLine(me)}</div></div><button class="b s" style="margin-left:auto" onclick="lockScreen()">🔒 Funga</button></div>`)};
@@ -848,7 +851,7 @@ function printPayroll(){const R=payRows();if(!R.length)return alert('Hakuna wafa
   <tfoot><tr><td colspan="3" class="l">JUMLA</td><td>${N(T('S'))}</td><td>${N(T('ded'))}</td><td>${N(T('arr'))}</td><td>${N(T('net'))}</td><td>${N(T('kudai'))}</td><td>${N(T('pM'))}</td><td>${N(T('salio'))}</td><td></td></tr></tfoot></table>
   <div class="sg"><div>Imeandaliwa na: ${esc(me.name)}<br><br>Sahihi: ____________________</div><div>Imekaguliwa na: ____________________<br><br>Sahihi: ____________________</div></div></body></html>`)}
 function aPayroll(){if(!dedSub){dedSub=1;unsub.push(db.collection('deductions').onSnapshot(s=>{DED=arr(s);render()},()=>permWarn('deductions')))}
-  const R=payRows(),T=k=>sum(R,r=>r[k]),N=x=>Number(x).toLocaleString('en-US'),kp=(l,v,c)=>`<div style="border-left:4px solid ${c}"><small>${l}</small><b>${N(v)}</b></div>`,
+  const R=payRows(),T=k=>sum(R,r=>r[k]),N=x=>Number(x).toLocaleString('en-US'),kp=(l,v,c)=>`<div style="border-left:4px solid var(--t)"><small>${l}</small><b>${N(v)}</b></div>`,
   D=DED.filter(d=>d.month===pm&&(!bsel||d.branch===bsel)).sort((a,b)=>String(b.date).localeCompare(String(a.date))),all=Object.values(EMP).sort((a,b)=>String(a.name).localeCompare(b.name));
   return brSel()+`<div class="box"><h3>💼 Payroll ya Mwezi ${pm}</h3>
   <div class="pk">${kp('Mshahara wa msingi',T('S'),'#d32f2f')}${kp('Jumla ya makato',T('ded'),'#c2185b')}${kp('Mshahara halisi',T('net'),'#2e7d32')}${kp('Jumla iliyolipwa',T('pM'),'#1565c0')}${kp('Deni la mishahara',T('salio'),'#e65100')}${kp('Wafanyakazi',R.length,'#6a1b9a')}</div>
@@ -914,7 +917,8 @@ aPos=(o=>()=>rvBox()+o()+invBox())(aPos);
 
 /* ===== Rangi za mfumo (Setting) + maelezo kamili ya mfanyakazi ===== */
 const THEMES=[['Bahari','#0b2545','#13a89e'],['Kijani','#14532d','#22a559'],['Bluu','#1e3a8a','#3b82f6'],['Zambarau','#4c1d95','#8b5cf6'],['Nyekundu','#7f1d1d','#e04848'],['Machungwa','#7c2d12','#f08a24'],['Pinki','#831843','#e0518f'],['Nyeusi','#111827','#f5a524']];
-function applyTheme(){const n=BIZ.themeN??localStorage.getItem('lk_thn'),t=BIZ.themeT??localStorage.getItem('lk_tht'),r=document.documentElement.style;
+function applyTheme(){let mt=document.querySelector('meta[name=theme-color]');if(!mt){mt=document.createElement('meta');mt.name='theme-color';document.head.appendChild(mt)}mt.content=BIZ.themeN||localStorage.getItem('lk_thn')||'#0b2545';
+  const n=BIZ.themeN??localStorage.getItem('lk_thn'),t=BIZ.themeT??localStorage.getItem('lk_tht'),r=document.documentElement.style;
   n?r.setProperty('--n',n):r.removeProperty('--n');t?r.setProperty('--t',t):r.removeProperty('--t');localStorage.setItem('lk_thn',n||'');localStorage.setItem('lk_tht',t||'')}
 async function setTheme(n,t){BIZ.themeN=n;BIZ.themeT=t;applyTheme();try{await db.collection('settings').doc('biz').set({themeN:n,themeT:t},{merge:true});toast('Rangi zimebadilishwa')}catch(e){alert(e.message)}render()}
 const themeBox=()=>`<div class="box"><h3>🎨 Rangi za mfumo (template)</h3><p class="mu">Chagua rangi. Inatumika kwa wafanyakazi na wateja wote.</p>
