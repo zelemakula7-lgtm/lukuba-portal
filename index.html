@@ -92,7 +92,7 @@ function toast(m) {
   const d = document.createElement('div'); d.textContent = m; $('#toast').appendChild(d);
   setTimeout(() => d.remove(), 5000);
   try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(); o.connect(a.destination); o.frequency.value = 880; o.start(); o.stop(a.currentTime + .2); } catch (e) {}
-  try { if (window.Notification && Notification.permission === 'granted') new Notification('LUKUBA SHOP', { body: m }); } catch (e) {}
+  try { if (/^Oda mpya|^Oda #\d+: /.test(m)) showNotif('LUKUBA SHOP', m); } catch (e) {}
 }
 
 /* ---------- START ---------- */
@@ -111,7 +111,7 @@ if (FIREBASE_CONFIG.apiKey === 'WEKA_HAPA') {
   });
   db.collection('settings').doc('biz').onSnapshot(d => { BIZ = d.exists ? d.data() : {}; renderBanner(); render(); });
   auth.onAuthStateChanged(async u => {
-    unsub.forEach(f => f()); unsub = []; actSub = 0; dedSub = 0; myO = []; allO = []; firstO = true;
+    unsub.forEach(f => f()); unsub = []; actSub = 0; dedSub = 0; presSub = 0; myO = []; allO = []; firstO = true;
     if (!u) { me = null; render(); return; }
     let d = await db.collection('users').doc(u.uid).get();
     if (!d.exists) {
@@ -584,7 +584,7 @@ function vAdmin(){
 function aCust(){const ord={};allO.filter(o=>o.status!=='Cancelled').forEach(o=>{const c=ord[o.uid]=ord[o.uid]||{c:0,t:0};c.c++;c.t+=o.total});
   const l=[...UC.map(u=>({...u,k:'📱 Mtandaoni'})),...CU.map(u=>({...u,k:'🏪 Dukani'}))].filter(c=>!q||(c.name+(c.phone||'')).toLowerCase().includes(q.toLowerCase()));
   return `<div class="box"><h3>Ongeza mteja (dukani)</h3><input id="c_n" placeholder="Jina"><input id="c_p" type="tel" placeholder="Simu (si lazima)"><button class="b" onclick="addCus()">Hifadhi</button></div>
-  <input id="q" placeholder="🔍 Tafuta mteja..." value="${esc(q)}" oninput="q=this.value;render()"><div class="box"><table><tr><th>Mteja</th><th>Aina</th><th>Oda</th><th>Jumla</th><th></th></tr>${l.map(c=>`<tr><td>${esc(c.name)}<div class="mu">${esc(c.phone||'Hana simu')}</div></td><td>${c.k}</td><td>${(ord[c.id]||{c:0}).c}</td><td>${TZS((ord[c.id]||{t:0}).t)}</td><td style="white-space:nowrap"><button class="b s" onclick="editCus('${c.id}','${c.k.includes('Duka')?'customers':'users'}')">✏</button> <button class="b s" data-n="${esc(c.name)}" onclick="printCust(this.dataset.n)">🖨</button></td></tr>`).join('')||'<tr><td colspan=4>Hakuna</td></tr>'}</table></div>`}
+  <input id="q" placeholder="🔍 Tafuta mteja..." value="${esc(q)}" oninput="q=this.value;render()"><div class="box"><table><tr><th>Mteja</th><th>Aina</th><th>Oda</th><th>Jumla</th><th></th></tr>${l.map(c=>`<tr><td>${esc(c.name)}<div class="mu">${esc(c.phone||'Hana simu')}</div></td><td>${c.k}</td><td>${(ord[c.id]||{c:0}).c}</td><td>${TZS((ord[c.id]||{t:0}).t)}</td><td style="white-space:nowrap"><button class="b s" onclick="editCus('${c.id}','${c.k.includes('Duka')?'customers':'users'}')">✏</button> <button class="b s" data-n="${esc(c.name)}" onclick="printCust(this.dataset.n)">🖨</button>${isMgr()?` <button class="b s" data-n="${esc(c.name)}" data-p="${esc(c.phone||'')}" onclick="saveContact(this.dataset.n,this.dataset.p)">📇</button>`:''}</td></tr>`).join('')||'<tr><td colspan=4>Hakuna</td></tr>'}</table></div>`}
 async function addCus(){const n=$('#c_n').value.trim();if(!n)return alert('Andika jina');if(byName(CL(),n))return alert('Mteja huyu yupo tayari');
   try{await db.collection('customers').add({name:n,phone:$('#c_p').value.trim(),at:SV()});clr(['c_n','c_p']);toast('Mteja ameongezwa: '+n)}catch(e){alert(e.message)}}
 /* Supplies */
@@ -867,6 +867,33 @@ function aPayroll(){if(!dedSub){dedSub=1;unsub.push(db.collection('deductions').
   <div class="box" style="overflow-x:auto"><h3>Historia ya malipo ya mishahara</h3><table class="pt"><tr><th class="l">Tarehe</th><th class="l">Mfanyakazi</th><th>Mwezi</th><th>Kiasi</th><th></th></tr>
   ${SPAY.filter(p=>!bsel||p.branch===bsel).sort((a,b)=>dt(b)-dt(a)).slice(0,60).map(p=>`<tr><td class="l">${fd(dt(p))}</td><td class="l">${esc(p.name)}</td><td>${esc(p.month||ym(dt(p)))}</td><td>${N(p.amount)}</td><td><button class="b s" onclick="editSalaryPay('${p.id}')">✏</button> <button class="b d" onclick="delDoc('salaryPays','${p.id}')">✖</button></td></tr>`).join('')||'<tr><td colspan="5" class="l">Hakuna malipo bado</td></tr>'}</table></div>`}
 aSal=aPayroll;
+
+/* ===== Arifa (simu), Online ya wafanyakazi, na Contacts za wateja ===== */
+function showNotif(t,b){try{if(!('Notification' in window)||Notification.permission!=='granted')return;if(navigator.vibrate)navigator.vibrate([200,100,200]);
+  const o={body:b,icon:'icon-192.png',badge:'icon-192.png',tag:'lk-'+Date.now(),renotify:true};
+  if(navigator.serviceWorker&&navigator.serviceWorker.ready)navigator.serviceWorker.ready.then(r=>r.showNotification(t,o)).catch(()=>{});else new Notification(t,{body:b})}catch(e){}}
+async function askNotif(){try{const p=await Notification.requestPermission();if(p==='granted'){showNotif('LUKUBA SHOP','Arifa zimewashwa ✅')}else alert('Arifa zimezuiwa. Ziwashe kwenye mipangilio ya Chrome/app kisha jaribu tena.')}catch(e){alert('Simu hii haitumii arifa.')}render()}
+const _enh2=enhance;enhance=function(){_enh2();const A=$('#app');if(!A||!me)return;
+  if('Notification' in window&&Notification.permission==='default'&&!A.querySelector('#nfb'))A.insertAdjacentHTML('afterbegin',`<div class="box" id="nfb" style="display:flex;align-items:center;gap:10px"><div class="mu" style="flex:1">🔔 Washa arifa upate taarifa ${isStaff()?'oda mpya zikiingia':'oda yako ikithibitishwa'} kwenye simu.</div><button class="b g" onclick="askNotif()">Washa arifa</button></div>`);
+  const w=A.querySelector('#who');if(w&&isMgr()&&!w.querySelector('#onb')){const lb=w.querySelector('button'),n=PRES.filter(p=>isOn(p)).length;lb.style.marginLeft='0';lb.insertAdjacentHTML('beforebegin',`<button class="b s" id="onb" style="margin-left:auto" onclick="showOnline()">👥 Online (${n})</button>`)}
+  if(isMgr()&&!presSub){presSub=1;unsub.push(db.collection('presence').onSnapshot(s=>{const was=presInit,old=presOn;PRES=arr(s);const cur={};PRES.filter(isOn).forEach(p=>cur[p.id]=1);
+    if(was)PRES.filter(isOn).forEach(p=>{if(p.id!==me.id&&!old[p.id]){const m='👤 '+p.name+' ('+(RLB[p.role]||p.role)+') ameingia kwenye mfumo';toast(m)}});
+    const sig=Object.keys(cur).sort().join();presInit=1;presOn=cur;if(sig!==presSig){presSig=sig;render()}},()=>permWarn('presence')))}};
+let PRES=[],presSub=0,presInit=0,presOn={},presSig='';
+const isOn=p=>Date.now()-(p.at&&p.at.toMillis?p.at.toMillis():0)<(p.role==='customer'?8:3)*60000;
+function beat(f){if(!me||document.hidden)return;if(beat.u!==me.id){beat.u=me.id;beat.t=0}const n=Date.now(),gap=isStaff()?60000:300000;if(!f&&n-beat.t<gap-5000)return;beat.t=n;
+  db.collection('presence').doc(me.id).set({name:me.name||'',role:me.role||'',title:me.title||'',branch:me.branch||'',page:view==='admin'?(TL[tab]||tab):'Duka',at:SV()}).catch(()=>{})}
+setInterval(()=>beat(),30000);document.addEventListener('visibilitychange',()=>beat());addEventListener('pointerdown',()=>beat(),{capture:true,passive:true});
+function showOnline(){const l=[...PRES].sort((a,b)=>(isOn(b)-isOn(a))||((b.at&&b.at.toMillis?b.at.toMillis():0)-(a.at&&a.at.toMillis?a.at.toMillis():0))),o=document.createElement('div');o.id='mdl';
+  o.innerHTML=`<div class="m" style="max-height:85vh;overflow:auto"><b>👥 Wanaotumia mfumo</b><div class="mu">Anayeonekana "Yupo sasa" ametumia mfumo ndani ya dakika chache zilizopita.</div>${l.map(p=>{const on=isOn(p),t=p.at&&p.at.toDate?p.at.toDate():null;return`<div class="row" style="padding:8px 0;border-bottom:1px solid #e3e8ef">${avatar(EMP[p.id]||p,38)}<div style="flex:1"><b>${esc(p.name)}</b><div class="mu">${esc(p.title||RLB[p.role]||p.role)}${p.page?' · '+esc(p.page):''}</div></div><div style="text-align:right;color:${on?'#2e7d32':'#78909c'};font-size:12px">${on?'🟢 Yupo sasa':'⚪ '+(t?t.toLocaleString('sw-TZ',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'-')}</div></div>`}).join('')||'<p class="mu">Hakuna aliyeonekana bado.</p>'}<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="b" id="onx">Funga</button></div></div>`;
+  document.body.appendChild(o);o.querySelector('#onx').onclick=()=>o.remove()}
+/* Contacts: hifadhi jina na namba kwenye simu (faili la .vcf) */
+const tzPhone=p=>{p=String(p||'').replace(/[^\d+]/g,'');if(!p)return'';if(p[0]==='+')return p;if(p.startsWith('255'))return'+'+p;if(p[0]==='0')return'+255'+p.slice(1);return p},
+vcard=(n,p)=>'BEGIN:VCARD\r\nVERSION:3.0\r\nFN:'+n+'\r\nN:;'+n+';;;\r\nTEL;TYPE=CELL:'+tzPhone(p)+'\r\nORG:LUKUBA SHOP (Mteja)\r\nEND:VCARD\r\n';
+function vcfDl(name,txt){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/vcard'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+function saveContact(n,p){if(!tzPhone(p))return alert('Mteja huyu hana namba ya simu. Hariri (✏) uongeze namba.');vcfDl(n.replace(/[^\w ]/g,'')+'.vcf',vcard(n,p));toast('Fungua faili lililopakuliwa ili kuhifadhi '+n+' kwenye Contacts')}
+function saveAllContacts(){const l=CL().filter(c=>tzPhone(c.phone));if(!l.length)return alert('Hakuna wateja wenye namba za simu.');vcfDl('LUKUBA-wateja.vcf',l.map(c=>vcard(c.name,c.phone)).join(''));toast('Wateja '+l.length+' wamepakuliwa. Fungua faili ili kuwahifadhi kwenye Contacts')}
+aCust=(o=>()=>(isMgr()?`<div class="box"><h3>📇 Hifadhi kwenye Contacts za simu</h3><p class="mu">Wateja wenye namba: ${CL().filter(c=>tzPhone(c.phone)).length} kati ya ${CL().length}. Bonyeza kitufe, kisha fungua faili la <b>LUKUBA-wateja.vcf</b> litakalopakuliwa na uchague Contacts. Mteja mmoja: tumia kitufe cha 📇 kwenye safu yake.</p><button class="b g" onclick="saveAllContacts()">📇 Hifadhi wateja wote kwenye Contacts</button></div>`:'')+o())(aCust);
 </script>
 </body>
 </html>
