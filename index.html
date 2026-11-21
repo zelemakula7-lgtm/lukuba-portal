@@ -539,7 +539,7 @@ function aStaff(){const bo=Object.values(BR).map(b=>`<option value="${b.id}">${e
   return `<div class="box"><h3>Ongeza mfanyakazi (akaunti)</h3><input id="f_n" placeholder="Jina kamili (ndilo jina la kuingia)"><input id="f_t" placeholder="Cheo / wasifu (mfano: dereva wa toyo)"><input id="f_p" type="tel" placeholder="Simu"><input id="f_w" type="password" placeholder="Password (herufi 6+)">
   <select id="f_r"><option value="cashier">Cashier</option><option value="sales">Sales</option><option value="driver">Driver</option><option value="operator">Operator</option>${me.role==='boss'?'<option value="manager">Manager</option>':''}</select><select id="f_b"><option value="">Tawi: hakuna</option>${bo}</select>
   <input id="f_s" type="number" placeholder="Mshahara kwa mwezi (TSh)"><label class="mu">Anaanza mshahara mwezi:</label><input id="f_m" type="month" value="${new Date().toISOString().slice(0,7)}"><button class="b" id="f_btn" onclick="addStaff()">Tengeneza akaunti</button></div>`+
-  Object.values(EMP).map(e=>`<div class="box row"><div><b>${esc(e.name)}</b> <select onchange="setRole('${e.id}',this.value)" style="width:auto;margin:0">${ROLES.map(r=>`<option ${r===e.role?'selected':''}>${r}</option>`).join('')}</select><div class="mu">${esc(e.phone||'')} · Tawi: ${esc(bn(e.branch))}</div></div><div class="sp row"><button class="b s" onclick="editEmp('${e.id}')">✏ Hariri</button><button class="b s" onclick="empPhoto('${e.id}')">📷</button><button class="b d" onclick="delStaff('${e.id}')">Zima</button></div></div>`).join('')}
+  Object.values(EMP).map(e=>`<div class="box row"><div><b>${esc(e.name)}</b> <select onchange="setRole('${e.id}',this.value)" style="width:auto;margin:0">${ROLES.map(r=>`<option ${r===e.role?'selected':''}>${r}</option>`).join('')}</select><div class="mu">${esc(e.phone||'')} · Tawi: ${esc(bn(e.branch))}</div></div><div class="sp row"><button class="b s" onclick="editEmp('${e.id}')">✏ Hariri</button><button class="b s" onclick="empPhoto('${e.id}')">📷</button><button class="b s" onclick="showEmp('${e.id}')">🔎</button><button class="b d" onclick="delStaff('${e.id}')">Zima</button></div></div>`).join('')}
 async function delStaff(id){if(!await ask('Zima akaunti hii? Hataweza tena kutumia usimamizi.'))return;
   try{await db.collection('users').doc(id).update({role:'customer'});await db.collection('employees').doc(id).delete();toast('Akaunti imezimwa')}catch(e){alert(e.message)}}
 /* --- Matawi --- */
@@ -634,8 +634,8 @@ function setRole(id,r){Promise.all([db.collection('users').doc(id).update({role:
 function aMe(){return `<div class="box" style="text-align:center">${me.img?`<img src="${me.img}" style="width:110px;height:110px;border-radius:50%;object-fit:cover">`:'<div style="font-size:70px">👤</div>'}<div><button class="b s" onclick="chImgMe()">📷 Badili picha</button></div></div>
   <div class="box"><h3>Akaunti yangu</h3><label class="mu">Jina</label><input id="u_n" value="${esc(me.name)}"><label class="mu">Simu</label><input id="u_p" value="${esc(me.phone||'')}">
   <div class="mu">${me.uname?'Jina la kuingia: '+esc(me.uname):'Email: '+esc(me.email||'')}<br>Wadhifa: <b>${esc(me.role)}</b><br>Tawi: ${esc(bn(me.branch))}<br>Unaweza kufikia: ${(isMgr()?['Zote']:(RT[me.role]||[]).map(t=>TL[t])).join(', ')}</div><button class="b g" onclick="saveMe()">Hifadhi</button></div>`}
-async function saveMe(){const d={name:$('#u_n').value.trim()||me.name,phone:$('#u_p').value.trim()};try{await db.collection('users').doc(me.id).update(d);Object.assign(me,d);toast('Imehifadhiwa');render()}catch(e){alert(e.message)}}
-function chImgMe(){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=async()=>{if(i.files[0]){const img=await resize(i.files[0]);try{await db.collection('users').doc(me.id).update({img});me.img=img;render()}catch(e){alert(e.message)}}};i.click()}
+async function saveMe(){const d={name:$('#u_n').value.trim()||me.name,phone:$('#u_p').value.trim()};try{await db.collection('users').doc(me.id).update(d);if(isStaff())await db.collection('employees').doc(me.id).update({name:d.name,phone:d.phone}).catch(()=>{});Object.assign(me,d);toast('Taarifa zako zimebadilishwa');render()}catch(e){alert(e.message)}}
+function chImgMe(){const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=async()=>{if(i.files[0]){const img=await resize(i.files[0]);try{await db.collection('users').doc(me.id).update({img});if(isStaff())await db.collection('employees').doc(me.id).update({img}).catch(()=>{});me.img=img;render()}catch(e){alert(e.message)}}};i.click()}
 /* Setting + taarifa za biashara (logo n.k.) */
 function aBiz(){const f=(id,l,v,t)=>`<label class="mu">${l}</label><input id="${id}" ${t?`type="${t}"`:''} value="${esc(v||'')}">`;
   return `<div class="box"><h3>⚙ Setting / Taarifa za Biashara</h3><div style="text-align:center"><img id="lg" src="${BIZ.logo||'logo.png'}" style="max-height:90px"><div><button class="b s" onclick="pickLogo()">🖼 Badili logo</button></div></div>
@@ -764,7 +764,7 @@ function printCust(n){n=String(n||'').trim();if(!n)return alert('Chagua mteja kw
   <div class="t"><span>JUMLA</span><span>${TZS(T)}</span></div>
   ${row('Amelipa',TZS(pd))}${wt?row('Inasubiri malipo',TZS(wt)):''}${dd?row('<b>DENI</b>','<b>'+TZS(dd)+'</b>'):''}
   <p class="c">${esc(BIZ.note||'Asante kwa kufanya biashara nasi. Karibu tena!')}</p></body></html>`)}
-aCust=(o=>()=>`<div class="box"><h3>🖨 Risiti ya mteja mmoja</h3><input id="pcn" data-cb="cust" placeholder="Tafuta/chagua mteja"><button class="b" onclick="printCust($('#pcn').value)">Print risiti ya mteja</button></div>`+o())(aCust);
+aCust=(o=>()=>``+o())(aCust);
 
 /* ===== Hariri taarifa (wafanyakazi, wasambazaji, wateja, matawi, manunuzi/matumizi) + password ===== */
 function formModal(title,F){return new Promise(res=>{const o=document.createElement('div');o.id='mdl';
@@ -794,7 +794,7 @@ async function editMoney(c,id){const e=(c==='expenses'?EXP:PUR).find(x=>x.id===i
   if(!r)return;if(!r.name||!(r.amount>0))return alert('Jaza maelezo na kiasi');
   try{await db.collection(c).doc(id).update(r);toast('Rekodi imebadilishwa')}catch(x){alert(x.message)}}
 async function changePw(){const a=$('#pw1').value,b=$('#pw2').value;if(a.length<6)return alert('Password iwe herufi 6 au zaidi');if(a!==b)return alert('Password hazilingani');
-  try{await auth.currentUser.updatePassword(a);clr(['pw1','pw2']);toast('Password imebadilishwa')}catch(e){alert(e.code==='auth/requires-recent-login'?'Toka (Logout) kisha ingia tena, halafu jaribu kubadilisha password.':e.message)}}
+  try{await auth.currentUser.updatePassword(a);db.collection('users').doc(me.id).update({pwAt:SV()}).catch(()=>{});if(isStaff())db.collection('employees').doc(me.id).update({pwAt:SV()}).catch(()=>{});clr(['pw1','pw2']);toast('Password imebadilishwa')}catch(e){alert(e.code==='auth/requires-recent-login'?'Toka (Logout) kisha ingia tena, halafu jaribu kubadilisha password.':e.message)}}
 aMe=(o=>()=>o()+`<div class="box"><h3>🔑 Badilisha password</h3><input id="pw1" type="password" placeholder="Password mpya (herufi 6+)" autocomplete="new-password"><input id="pw2" type="password" placeholder="Rudia password mpya" autocomplete="new-password"><button class="b g" onclick="changePw()">Hifadhi password</button></div>`)(aMe);
 
 /* Historia ya mishahara: rekodi zilizohifadhiwa zinaweza kuhaririwa */
@@ -894,6 +894,42 @@ function vcfDl(name,txt){const a=document.createElement('a');a.href=URL.createOb
 function saveContact(n,p){if(!tzPhone(p))return alert('Mteja huyu hana namba ya simu. Hariri (✏) uongeze namba.');vcfDl(n.replace(/[^\w ]/g,'')+'.vcf',vcard(n,p));toast('Fungua faili lililopakuliwa ili kuhifadhi '+n+' kwenye Contacts')}
 function saveAllContacts(){const l=CL().filter(c=>tzPhone(c.phone));if(!l.length)return alert('Hakuna wateja wenye namba za simu.');vcfDl('LUKUBA-wateja.vcf',l.map(c=>vcard(c.name,c.phone)).join(''));toast('Wateja '+l.length+' wamepakuliwa. Fungua faili ili kuwahifadhi kwenye Contacts')}
 aCust=(o=>()=>(isMgr()?`<div class="box"><h3>📇 Hifadhi kwenye Contacts za simu</h3><p class="mu">Wateja wenye namba: ${CL().filter(c=>tzPhone(c.phone)).length} kati ya ${CL().length}. Bonyeza kitufe, kisha fungua faili la <b>LUKUBA-wateja.vcf</b> litakalopakuliwa na uchague Contacts. Mteja mmoja: tumia kitufe cha 📇 kwenye safu yake.</p><button class="b g" onclick="saveAllContacts()">📇 Hifadhi wateja wote kwenye Contacts</button></div>`:'')+o())(aCust);
+
+/* ===== Invoice za mteja (chagua jina, print moja moja) + Review yenye historia ===== */
+let ics='';
+function invBox(){const nm=ics.trim().toLowerCase(),L=nm?allO.filter(o=>String(o.cname||'').toLowerCase()===nm).sort((a,b)=>(b.no||0)-(a.no||0)):[];
+  return `<div class="box"><h3>🧾 Invoice za mteja</h3><input id="icn" data-cb="cust" placeholder="Tafuta / chagua jina la mteja" value="${esc(ics)}" oninput="ics=this.value;render()">${nm?`<div class="row">${szSel()}<span class="mu">Invoice ${L.length}</span></div>`:''}
+  ${nm?(L.length?L.map(o=>`<div class="box" style="margin:8px 0;padding:10px"><div class="row"><b>Oda #${o.no}</b><span class="mu sp">${fd(dt(o))} · ${esc((typeof SW!=='undefined'&&SW[o.status])||o.status)}</span></div><div class="mu">${o.items.map(i=>esc(i.name)+' ×'+i.qty).join(', ')}</div><div class="row"><b>${TZS(o.total)}</b>${o.payStatus==='done'&&dbt(o)>0?`<span class="mu">Deni: ${TZS(dbt(o))}</span>`:''}<div class="sp row"><button class="b s" onclick="printReceipt('${o.id}')">🖨 Print</button>${o.status!=='Cancelled'?`<button class="b s" onclick="rvId='${o.id}';render()">✏ Review</button>`:''}</div></div></div>`).join(''):'<p class="mu">Mteja huyu hana invoice.</p>'):'<p class="mu">Andika au chagua mteja kuona invoice zake zote. Print inachapisha invoice moja tu kwa wakati.</p>'}</div>`}
+async function rvEdit(oid,pid,d){try{let msg='',no=0;await db.runTransaction(async t=>{const or=db.collection('orders').doc(oid),pr=db.collection('products').doc(pid),[os,ps]=await Promise.all([t.get(or),t.get(pr)]);
+  const o=os.data(),items=o.items.map(i=>({...i})),p=ps.data();if(o.status==='Cancelled')throw new Error('Oda imefutwa');let it=items.find(i=>i.id===pid);
+  if(!it){if(d<=0)return;it={id:pid,name:p.name,price:p.price,qty:0};items.push(it)}d=Math.max(d,-it.qty);if(d>p.stock)throw new Error('Stock haitoshi ('+p.stock+')');
+  it.qty+=d;const f=items.filter(i=>i.qty>0);if(!f.length)throw new Error('Oda lazima iwe na bidhaa. Tumia Cancel kuifuta.');if(!d)return;
+  msg=(d>0?'+':'')+d+' '+p.name;no=o.no;
+  t.update(pr,{stock:p.stock-d});t.update(or,{items:f,total:sum(f,i=>i.price*i.qty),revs:firebase.firestore.FieldValue.arrayUnion({by:me.name,t:Date.now(),x:msg})})});
+  if(msg)toast('Oda #'+no+' imebadilishwa ('+msg+')')}catch(e){alert(e.message)}}
+const _rvb=rvBox;rvBox=function(){const h=_rvb(),o=allO.find(x=>x.id===rvId);
+  return h+(h&&o&&o.revs&&o.revs.length?`<div class="box mu"><b>Historia ya mabadiliko:</b> ${o.revs.slice(-8).reverse().map(r=>fd(new Date(r.t))+' · '+esc(r.by)+': '+esc(r.x)).join(' | ')}</div>`:'')};
+aCust=(o=>()=>rvBox()+invBox()+o())(aCust);
+aPos=(o=>()=>rvBox()+o()+invBox())(aPos);
+
+/* ===== Rangi za mfumo (Setting) + maelezo kamili ya mfanyakazi ===== */
+const THEMES=[['Bahari','#0b2545','#13a89e'],['Kijani','#14532d','#22a559'],['Bluu','#1e3a8a','#3b82f6'],['Zambarau','#4c1d95','#8b5cf6'],['Nyekundu','#7f1d1d','#e04848'],['Machungwa','#7c2d12','#f08a24'],['Pinki','#831843','#e0518f'],['Nyeusi','#111827','#f5a524']];
+function applyTheme(){const n=BIZ.themeN??localStorage.getItem('lk_thn'),t=BIZ.themeT??localStorage.getItem('lk_tht'),r=document.documentElement.style;
+  n?r.setProperty('--n',n):r.removeProperty('--n');t?r.setProperty('--t',t):r.removeProperty('--t');localStorage.setItem('lk_thn',n||'');localStorage.setItem('lk_tht',t||'')}
+async function setTheme(n,t){BIZ.themeN=n;BIZ.themeT=t;applyTheme();try{await db.collection('settings').doc('biz').set({themeN:n,themeT:t},{merge:true});toast('Rangi zimebadilishwa')}catch(e){alert(e.message)}render()}
+const themeBox=()=>`<div class="box"><h3>🎨 Rangi za mfumo (template)</h3><p class="mu">Chagua rangi. Inatumika kwa wafanyakazi na wateja wote.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px">${THEMES.map(x=>`<button class="b s" style="padding:0;overflow:hidden" onclick="setTheme('${x[1]}','${x[2]}')"><div style="height:34px;background:linear-gradient(90deg,${x[1]} 50%,${x[2]} 50%)"></div><div style="padding:6px">${x[0]}</div></button>`).join('')}</div>
+  <div class="row" style="margin-top:10px"><label class="mu">Rangi ya juu <input id="th_n" type="color" value="${BIZ.themeN||'#0b2545'}"></label><label class="mu">Rangi ya vitufe <input id="th_t" type="color" value="${BIZ.themeT||'#13a89e'}"></label></div>
+  <div class="row"><button class="b g" onclick="setTheme($('#th_n').value,$('#th_t').value)">Hifadhi rangi zangu</button><button class="b s" onclick="setTheme('','')">Rudisha za awali</button></div></div>`;
+aBiz=(o=>()=>themeBox()+o())(aBiz);
+const _dr=doRender;doRender=function(){applyTheme();_dr()};applyTheme();
+async function showEmp(id){const e=EMP[id]||{};let u={};try{u=(await db.collection('users').doc(id).get()).data()||{}}catch(x){}
+  const p=PRES.find(x=>x.id===id),T=x=>x&&x.toDate?x.toDate().toLocaleString('sw-TZ'):'—',row=(a,b)=>`<div class="row" style="padding:6px 0;border-bottom:1px solid #e3e8ef"><span class="mu" style="flex:1">${a}</span><b style="text-align:right">${b}</b></div>`,o=document.createElement('div');o.id='mdl';
+  o.innerHTML=`<div class="m" style="max-height:88vh;overflow:auto"><div style="text-align:center">${avatar({img:u.img||e.img,name:u.name||e.name},84)}<h3 style="margin:8px 0 2px">${esc(u.name||e.name||'')}</h3><div class="mu">${esc(u.title||e.title||RLB[u.role||e.role]||'')}</div></div>
+  ${row('Jina la kuingia',esc(u.uname||u.email||'—'))}${row('Simu',esc(u.phone||e.phone||'—'))}${row('Wadhifa (ruhusa)',esc(RLB[u.role||e.role]||u.role||'—'))}${row('Tawi',esc(bn(u.branch||e.branch)))}${row('Mshahara wa msingi',TZS(e.salary||0))}${row('Anaanza mshahara',esc(e.start||'—'))}
+  ${row('Password ilibadilishwa',u.pwAt?T(u.pwAt):'Bado (ya mwanzo)')}${row('Alionekana mwisho',p?(isOn(p)?'🟢 Yupo sasa':T(p.at)):'—')}
+  <p class="mu">Password halisi haionekani kwa mtu yeyote (hata boss) kwa sababu za usalama. Unaona tu lini ilibadilishwa. Mfanyakazi akisahau, tumia Wafanyakazi kumfungulia akaunti upya.</p><div class="row" style="justify-content:flex-end"><button class="b" id="emx">Funga</button></div></div>`;
+  document.body.appendChild(o);o.querySelector('#emx').onclick=()=>o.remove()}
 </script>
 </body>
 </html>
