@@ -114,7 +114,7 @@ if (FIREBASE_CONFIG.apiKey === 'WEKA_HAPA') {
   });
   db.collection('settings').doc('biz').onSnapshot(d => { BIZ = d.exists ? d.data() : {}; renderBanner(); render(); });
   auth.onAuthStateChanged(async u => {
-    unsub.forEach(f => f()); unsub = []; actSub = 0; dedSub = 0; presSub = 0; myO = []; allO = []; firstO = true;
+    unsub.forEach(f => f()); unsub = []; actSub = 0; dedSub = 0; presSub = 0; poSub = 0; myO = []; allO = []; firstO = true;
     if (!u) { me = null; render(); return; }
     let d = await db.collection('users').doc(u.uid).get();
     if (!d.exists) {
@@ -252,11 +252,11 @@ function oCard(o, staff) {
   const nx = ST.filter(s => s !== o.status);
   return `<div class="box st-${o.status}"><div class="row"><b>Oda #${o.no}</b><span class="tag">${SW[o.status]} (${o.status})</span>
   <span class="mu sp">${o.at?.toDate ? o.at.toDate().toLocaleString('sw-TZ') : ''}</span></div>
-  ${staff ? `<div>👤 ${esc(o.cname)} · 📞 ${esc(o.phone)}</div>` : ''}
+  ${staff ? `<div>👤 ${esc(o.cname)} · 📞 ${esc(o.phone)}</div>` : ''}${staff && (o.seller || o.cashier) ? `<div class="mu">🧑‍💼 Mhudumu (sales): ${esc(o.seller || '—')}${o.cashier ? ' · 💵 Cashier: ' + esc(o.cashier) : ''}</div>` : ''}
   <div class="mu">${o.method === 'delivery' ? '🚚 Delivery: ' + esc(o.addr) : '🏪 Kuchukua dukani'}${o.note ? ' · ' + esc(o.note) : ''}</div>
   <table>${o.items.map(i => `<tr><td>${esc(i.name)}</td><td>${i.qty} × ${TZS(i.price)}</td><td>${TZS(i.qty * i.price)}</td></tr>`).join('')}</table>
   <h4 style="text-align:right;margin:6px 0">Jumla: ${TZS(o.total)}</h4>${payInfo(o)}
-  <div class="row" style="margin-bottom:8px">${isStaff() ? szSel() : ''}<button class="b s" onclick="printReceipt('${o.id}')">🖨 Print Risiti</button>${isStaff() && o.status !== 'Cancelled' ? `<button class="b s" onclick="rvId='${o.id}';render()">✏ Review</button>` : ''}</div>
+  <div class="row" style="margin-bottom:8px">${isStaff() ? szSel() : ''}<button class="b s" onclick="printReceipt('${o.id}')">🖨 Print Risiti</button>${isStaff() && o.status !== 'Cancelled' ? `<button class="b s" onclick="rvId='${o.id}';render()">✏ Review</button>` : ''}${me && (['cashier', 'sales'].includes(me.role) || isMgr()) ? `<button class="b d" onclick="delInv('${o.id}')">🗑 Futa</button>` : ''}</div>
   ${staff && isMgr() && !['Cancelled', 'Delivered'].includes(o.status) ? (o.status === 'Pending'
     ? `<div class="row"><button class="b g" onclick="setSt('${o.id}','Confirmed')">✔ Kubali</button><button class="b d" onclick="setSt('${o.id}','Cancelled')">✖ Kataa</button></div>`
     : `<div class="row"><select id="s${o.id}" style="max-width:240px;margin:0">${nx.map(s => `<option>${s}</option>`).join('')}</select><button class="b" onclick="setSt('${o.id}',$('#s${o.id}').value)">Badilisha hali</button></div>`) : ''}</div>`;
@@ -471,12 +471,12 @@ function aDash(){
 }
 /* --- Malipo (Cashier) --- */
 function aPay(){const l=allO.filter(o=>o.payStatus==='awaiting');
-  return l.map(o=>`<div class="box st-Confirmed"><b>Oda #${o.no}</b> · ${esc(o.cname)} · 📞 ${esc(o.phone)}<div class="mu">${o.items.map(i=>esc(i.name)+' ×'+i.qty).join(', ')}</div><h3>Jumla: ${TZS(o.total)}</h3>
+  return l.map(o=>`<div class="box st-Confirmed"><b>Oda #${o.no}</b> · ${esc(o.cname)} · 📞 ${esc(o.phone)}<div class="mu">${o.items.map(i=>esc(i.name)+' ×'+i.qty).join(', ')}</div>${o.seller?`<div class="mu">🧑‍💼 Amehudumiwa na (sales): <b>${esc(o.seller)}</b></div>`:''}<h3>Jumla: ${TZS(o.total)}</h3>
   <input id="pa${o.id}" type="number" value="${o.total}" placeholder="Kiasi alicholipa"><div class="mu">Asipolipa kikamilifu, deni linaandikwa automatically.</div>
   <div class="row"><button class="b g" onclick="confPay('${o.id}')">✔ Thibitisha malipo</button><button class="b s" onclick="printReceipt('${o.id}')">🖨 Risiti</button></div></div>`).join('')||'<div class="box">Hakuna oda zinazosubiri malipo.</div>'}
 async function confPay(id){const o=allO.find(x=>x.id===id),a=Number($('#pa'+id).value);
   if(!o||!(a>=0)||a>o.total)return alert('Kiasi si sahihi (0 hadi '+o.total+')');
-  try{await db.collection('orders').doc(id).update({paid:a,payStatus:'done',cashier:me.name,branch:o.branch||me.branch||''});
+  try{await db.collection('orders').doc(id).update({paid:a,payStatus:'done',cashier:me.name,cid:me.id,paidAt:SV(),branch:o.branch||me.branch||''});
   toast(a<o.total?'Deni '+TZS(o.total-a)+' limeandikwa kwa '+o.cname:'Malipo yamethibitishwa')}catch(e){alert(e.message)}}
 /* --- Madeni --- */
 function aDebt(){const l=allO.filter(o=>o.status!=='Cancelled'&&o.payStatus==='done'&&dbt(o)>0&&(!q||(o.cname||'').toLowerCase().includes(q.toLowerCase()))),m={};
@@ -507,7 +507,7 @@ async function doPos(){const ids=Object.keys(pos).filter(i=>pos[i]>0&&P[i]);if(!
     const refs=ids.map(i=>db.collection('products').doc(i)),sn=await Promise.all(refs.map(r=>t.get(r))),items=[];
     sn.forEach((s,k)=>{if(!s.exists)throw new Error('Bidhaa haipatikani');const p=s.data();if(p.stock<pos[ids[k]])throw new Error('"'+p.name+'" haitoshi');items.push({id:ids[k],name:p.name,price:p.price,qty:pos[ids[k]]})});
     sn.forEach((s,k)=>t.update(refs[k],{stock:s.data().stock-pos[ids[k]]}));t.set(cref,{n:no});
-    t.set(oref,{no,uid:'pos',cname:posN.trim()||'Mteja wa dukani',phone:'',items,total:tot,method:'pickup',addr:'',note:'Mauzo ya dukani',status:'Delivered',source:'pos',paid,payStatus:'done',branch:me.branch||'',seller:me.name,at:SV()})});
+    t.set(oref,{no,uid:'pos',cname:posN.trim()||'Mteja wa dukani',phone:'',items,total:tot,method:'pickup',addr:'',note:'Mauzo ya dukani',status:'Delivered',source:'pos',paid,payStatus:'done',branch:me.branch||'',seller:me.name,sid:me.id,at:SV()})});
   pos={};posN='';posPd='';render();toast('Mauzo #'+no+' yamekamilika'+(paid<tot?' · Deni '+TZS(tot-paid):''))}catch(e){alert(e.message)}}
 /* --- Stock: punguza / ongeza (inarekodi manunuzi) --- */
 async function subStock(id){const v=parseInt(await askIn('Punguza stock kiasi gani? (mf. 2)',''));if(!v||v<0)return;if(v>P[id].stock)return alert('Stock iliyopo ni '+P[id].stock);
@@ -580,7 +580,7 @@ function vAdmin(){
   if(!isStaff())return '<div class="box">Huna ruhusa.</div>';
   const T=isMgr()?['dash','orders','pay','pos','debt','prod','buy','sup','exp','sal','staff','br','rep','cust','top','db','biz','me']:(RT[me.role]||['orders','me']);
   if(!seen){seen=1;tab=T[0]}if(!T.includes(tab))tab=T[0];
-  const F={dash:aDash,orders:aOrders,pay:aPay,pos:aPos,debt:aDebt,prod:aProd,buy:aBuy,sup:aSup,exp:()=>aMoney('expenses','Matumizi'),sal:aSal,staff:aStaff,br:aBr,rep:aRep,cust:aCust,top:aTop,biz:aBiz,db:aDb,me:aMe};
+  const F={dash:aDash,orders:aOrders,pay:aPay,pos:aPos,debt:aDebt,prod:aProd,buy:aBuy,sup:aSup,exp:()=>aMoney('expenses','Matumizi'),sal:aSal,staff:aStaff,br:aBr,rep:aRep,cust:aCust,top:aTop,biz:aBiz,db:aDb,mine:aMine,me:aMe};
   return `<div class="row tabs" style="margin-bottom:10px">${T.map(t=>`<button class="b ${tab===t?'':'s'}" onclick="tab='${t}';render()">${TL[t]}</button>`).join('')}</div>`+F[tab]();
 }
 /* Wateja (wote sehemu moja) */
@@ -617,7 +617,7 @@ async function doPos(){const ids=Object.keys(pos).filter(i=>pos[i]>0&&P[i]);if(!
   await db.runTransaction(async t=>{const cs=await t.get(cref);no=(cs.exists?cs.data().n:1000)+1;const refs=ids.map(i=>db.collection('products').doc(i)),sn=await Promise.all(refs.map(r=>t.get(r))),items=[];
     sn.forEach((s,k)=>{if(!s.exists)throw new Error('Bidhaa haipatikani');const p=s.data();if(p.stock<pos[ids[k]])throw new Error('"'+p.name+'" haitoshi');items.push({id:ids[k],name:p.name,price:p.price,qty:pos[ids[k]]})});
     sn.forEach((s,k)=>t.update(refs[k],{stock:s.data().stock-pos[ids[k]]}));t.set(cref,{n:no});
-    t.set(oref,{no,uid:c?c.id:'walkin',cname:nm||'Mteja wa dukani',phone:c?c.phone:'',items,total:sum(items,i=>i.price*i.qty),method:'pickup',addr:'',note:'Mauzo ya dukani',status:'Confirmed',source:'pos',paid:0,payStatus:'awaiting',branch:me.branch||'',seller:me.name,at:SV()})});
+    t.set(oref,{no,uid:c?c.id:'walkin',cname:nm||'Mteja wa dukani',phone:c?c.phone:'',items,total:sum(items,i=>i.price*i.qty),method:'pickup',addr:'',note:'Mauzo ya dukani',status:'Confirmed',source:'pos',paid:0,payStatus:'awaiting',branch:me.branch||'',seller:me.name,sid:me.id,at:SV()})});
   pos={};posN='';clrcb('cust');render();toast('Oda #'+no+' imetumwa kwa cashier')}catch(e){alert(e.message)}}
 /* Review ya oda (ongeza / punguza / badili bidhaa) */
 function rvBox(){const o=allO.find(x=>x.id===rvId);if(!o)return'';
@@ -902,7 +902,7 @@ aCust=(o=>()=>(isMgr()?`<div class="box"><h3>📇 Hifadhi kwenye Contacts za sim
 let ics='';
 function invBox(){const nm=ics.trim().toLowerCase(),L=nm?allO.filter(o=>String(o.cname||'').toLowerCase()===nm).sort((a,b)=>(b.no||0)-(a.no||0)):[];
   return `<div class="box"><h3>🧾 Invoice za mteja</h3><input id="icn" data-cb="cust" placeholder="Tafuta / chagua jina la mteja" value="${esc(ics)}" oninput="ics=this.value;render()">${nm?`<div class="row">${szSel()}<span class="mu">Invoice ${L.length}</span></div>`:''}
-  ${nm?(L.length?L.map(o=>`<div class="box" style="margin:8px 0;padding:10px"><div class="row"><b>Oda #${o.no}</b><span class="mu sp">${fd(dt(o))} · ${esc((typeof SW!=='undefined'&&SW[o.status])||o.status)}</span></div><div class="mu">${o.items.map(i=>esc(i.name)+' ×'+i.qty).join(', ')}</div><div class="row"><b>${TZS(o.total)}</b>${o.payStatus==='done'&&dbt(o)>0?`<span class="mu">Deni: ${TZS(dbt(o))}</span>`:''}<div class="sp row"><button class="b s" onclick="printReceipt('${o.id}')">🖨 Print</button>${o.status!=='Cancelled'?`<button class="b s" onclick="rvId='${o.id}';render()">✏ Review</button>`:''}</div></div></div>`).join(''):'<p class="mu">Mteja huyu hana invoice.</p>'):'<p class="mu">Andika au chagua mteja kuona invoice zake zote. Print inachapisha invoice moja tu kwa wakati.</p>'}</div>`}
+  ${nm?(L.length?L.map(o=>`<div class="box" style="margin:8px 0;padding:10px"><div class="row"><b>Oda #${o.no}</b><span class="mu sp">${fd(dt(o))} · ${esc((typeof SW!=='undefined'&&SW[o.status])||o.status)}</span></div><div class="mu">${o.items.map(i=>esc(i.name)+' ×'+i.qty).join(', ')}</div><div class="row"><b>${TZS(o.total)}</b>${o.payStatus==='done'&&dbt(o)>0?`<span class="mu">Deni: ${TZS(dbt(o))}</span>`:''}<div class="sp row"><button class="b s" onclick="printReceipt('${o.id}')">🖨 Print</button>${o.status!=='Cancelled'?`<button class="b s" onclick="rvId='${o.id}';render()">✏ Review</button>`:''}${['cashier','sales','boss','manager'].includes(me.role)?`<button class="b d" onclick="delInv('${o.id}')">🗑</button>`:''}</div></div></div>`).join(''):'<p class="mu">Mteja huyu hana invoice.</p>'):'<p class="mu">Andika au chagua mteja kuona invoice zake zote. Print inachapisha invoice moja tu kwa wakati.</p>'}</div>`}
 async function rvEdit(oid,pid,d){try{let msg='',no=0;await db.runTransaction(async t=>{const or=db.collection('orders').doc(oid),pr=db.collection('products').doc(pid),[os,ps]=await Promise.all([t.get(or),t.get(pr)]);
   const o=os.data(),items=o.items.map(i=>({...i})),p=ps.data();if(o.status==='Cancelled')throw new Error('Oda imefutwa');let it=items.find(i=>i.id===pid);
   if(!it){if(d<=0)return;it={id:pid,name:p.name,price:p.price,qty:0};items.push(it)}d=Math.max(d,-it.qty);if(d>p.stock)throw new Error('Stock haitoshi ('+p.stock+')');
@@ -934,6 +934,60 @@ async function showEmp(id){const e=EMP[id]||{};let u={};try{u=(await db.collecti
   ${row('Password ilibadilishwa',u.pwAt?T(u.pwAt):'Bado (ya mwanzo)')}${row('Alionekana mwisho',p?(isOn(p)?'🟢 Yupo sasa':T(p.at)):'—')}
   <p class="mu">Password halisi haionekani kwa mtu yeyote (hata boss) kwa sababu za usalama. Unaona tu lini ilibadilishwa. Mfanyakazi akisahau, tumia Wafanyakazi kumfungulia akaunti upya.</p><div class="row" style="justify-content:flex-end"><button class="b" id="emx">Funga</button></div></div>`;
   document.body.appendChild(o);o.querySelector('#emx').onclick=()=>o.remove()}
+
+/* ===== Kazi zangu (kila mfanyakazi anaona za kwake), cashier: futa invoice, Order kwa Supplier ===== */
+let mper='day',PO=[],poSub=0,poc=[];TL.mine='📋 Kazi zangu';['cashier','sales'].forEach(r=>{if(!RT[r].includes('mine'))RT[r].splice(RT[r].length-1,0,'mine')});DBS.po=['Orders za Supplier',()=>PO];
+const isMine=o=>o.sid===me.id||(!o.sid&&o.seller===me.name)||o.cid===me.id||(!o.cid&&o.cashier===me.name),
+sDate=o=>o.paidAt&&o.paidAt.toDate?o.paidAt.toDate():dt(o);
+function inPer(d,p){const n=new Date();if(p==='day')return d.toDateString()===n.toDateString();if(p==='week'){const w=new Date(n);w.setDate(n.getDate()-((n.getDay()+6)%7));w.setHours(0,0,0,0);return d>=w}return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()}
+function mineStats(p){const L=allO.filter(o=>o.status!=='Cancelled'&&isMine(o)),served=L.filter(o=>o.payStatus==='done'&&inPer(sDate(o),p)),pend=L.filter(o=>o.payStatus!=='done'&&inPer(dt(o),p));
+  return{served,pend,n:new Set(served.map(o=>o.uid+'|'+String(o.cname||'').toLowerCase())).size,tot:sum(served,o=>o.total)}}
+const servedStrip=()=>{const s=mineStats('day'),c=(l,v)=>`<div><div class="mu">${l}</div><b style="font-size:22px">${v}</b></div>`;return`<div class="box" style="display:flex;gap:18px;flex-wrap:wrap">${c('👥 Wateja waliohudumiwa leo',s.n)}${c('Oda zilizohudumiwa',s.served.length)}${c('Jumla ya mauzo',TZS(s.tot))}</div>`};
+function aMine(){const s=mineStats(mper),row=o=>`<div class="row" style="padding:7px 0;border-bottom:1px solid #e3e8ef"><div style="flex:1"><b>#${o.no}</b> · ${esc(o.cname)}<div class="mu">${fd(sDate(o))} · ${esc(SW[o.status]||o.status)}${o.payStatus==='done'&&dbt(o)>0?' · Deni '+TZS(dbt(o)):''}</div></div><b>${TZS(o.total)}</b><button class="b s" onclick="printReceipt('${o.id}')">🖨</button></div>`,srt=l=>[...l].sort((a,b)=>(b.no||0)-(a.no||0));
+  return `<div class="box"><h3>📋 Kazi zangu — ${esc(me.name)}</h3><p class="mu">Unaona oda zako tu (ulizotuma au ulizohudumia).</p><select onchange="mper=this.value;render()"><option value="day" ${mper==='day'?'selected':''}>Leo</option><option value="week" ${mper==='week'?'selected':''}>Wiki hii</option><option value="month" ${mper==='month'?'selected':''}>Mwezi huu</option></select>
+  <div class="pk"><div><small>Wateja waliohudumiwa</small><b>${s.n}</b></div><div><small>Oda zilizohudumiwa</small><b>${s.served.length}</b></div><div><small>Jumla ya mauzo</small><b>${Number(s.tot).toLocaleString('en-US')}</b></div><div><small>Zinasubiri malipo</small><b>${s.pend.length}</b></div></div></div>
+  <div class="box"><h3>⏳ Zimetumwa, zinasubiri cashier (${s.pend.length})</h3>${srt(s.pend).map(row).join('')||'<p class="mu">Hakuna.</p>'}</div>
+  <div class="box"><h3>✅ Zilizokwisha hudumiwa (${s.served.length})</h3>${srt(s.served).map(row).join('')||'<p class="mu">Hakuna bado.</p>'}</div>`}
+aPos=(o=>()=>(me&&['cashier','sales'].includes(me.role)?servedStrip():'')+o())(aPos);aPay=(o=>()=>(me&&me.role==='cashier'?servedStrip():'')+o())(aPay);
+async function delInv(id){const o=allO.find(x=>x.id===id);if(!o)return;if(me.role==='sales'&&!(o.sid===me.id&&!(o.paid>0)))return alert('Unaweza kufuta invoice zako ambazo hazijalipwa tu.');if(me.role==='cashier'&&o.paid>0)return alert('Invoice yenye malipo inafutwa na manager.');if(!await ask('Futa invoice #'+o.no+' ya '+o.cname+' ('+TZS(o.total)+')? Bidhaa zitarudi kwenye stock. Kitendo hiki hakiwezi kurudishwa.'))return;
+  try{await db.runTransaction(async t=>{const or=db.collection('orders').doc(id),os=await t.get(or);if(!os.exists)return;const d=os.data();
+    if(d.status!=='Cancelled'){const refs=d.items.map(i=>db.collection('products').doc(i.id)),sn=await Promise.all(refs.map(r=>t.get(r)));sn.forEach((x,k)=>{if(x.exists)t.update(refs[k],{stock:(x.data().stock||0)+d.items[k].qty})})}
+    t.delete(or)});
+  logAct('Invoice #'+o.no+' ilifutwa: '+o.cname+' · '+TZS(o.total)+' · '+o.items.map(i=>i.name+'×'+i.qty).join(', '));toast('Invoice #'+o.no+' imeondolewa')}catch(e){alert(e.message)}}
+/* Order kwa Supplier: bidhaa zinaingia store ukibonyeza Done */
+function poAdd(){const p=byName(Object.values(P),$('#po_p').value),q=parseInt($('#po_q').value),c=Number($('#po_c').value)||(p&&CST[p.id])||0;if(!p)return alert('Chagua bidhaa kutoka kwenye orodha');if(!(q>0))return alert('Weka idadi');
+  const x=poc.find(i=>i.id===p.id);if(x){x.q+=q;x.c=c||x.c}else poc.push({id:p.id,name:p.name,q,c});clr(['po_p','po_q','po_c']);render()}
+async function poSave(){const sn=$('#po_s').value.trim();if(!sn)return alert('Chagua msambazaji');if(!poc.length)return;
+  try{let no=0;const mr=db.collection('meta').doc('po'),or=db.collection('poOrders').doc();
+    await db.runTransaction(async t=>{const m=await t.get(mr);no=(m.exists?m.data().n:0)+1;t.set(mr,{n:no});t.set(or,{no,supplier:sn,items:poc.map(x=>({id:x.id,name:x.name,qty:x.q,cost:x.c})),total:sum(poc,x=>x.q*x.c),status:'Pending',by:me.name,branch:me.branch||'',at:SV()})});
+    poc=[];clr(['po_s']);toast('Order #'+no+' kwa '+sn+' imehifadhiwa, inasubiri mzigo')}catch(e){alert(e.message)}}
+async function poDone(id){const po=PO.find(x=>x.id===id);if(!po||po.status!=='Pending')return;if(!await ask('Mzigo wa Order #'+po.no+' umepokelewa? Bidhaa zitaingia store na order itafungwa.'))return;
+  try{await db.runTransaction(async t=>{const pr=db.collection('poOrders').doc(id),ps=await t.get(pr);if(!ps.exists||ps.data().status!=='Pending')throw new Error('Order hii tayari imeshughulikiwa');
+    const refs=po.items.map(i=>db.collection('products').doc(i.id)),sn=await Promise.all(refs.map(r=>t.get(r)));
+    sn.forEach((x,k)=>{if(x.exists)t.update(refs[k],{stock:(x.data().stock||0)+po.items[k].qty})});
+    po.items.forEach(i=>{if(i.cost>0)t.set(db.collection('costs').doc(i.id),{cost:i.cost})});
+    t.update(pr,{status:'Received',receivedAt:SV(),receivedBy:me.name})});
+    await db.collection('purchases').add({name:'Order #'+po.no+' - '+po.supplier,amount:po.total,supplier:po.supplier,po:id,branch:po.branch||me.branch||'',by:me.name,at:SV()}).catch(()=>{});
+    toast('Order #'+po.no+' imepokelewa, bidhaa zimeingia store')}catch(e){alert(e.message)}}
+async function poCancel(id){const po=PO.find(x=>x.id===id);if(!po||po.status!=='Pending')return;if(!await ask('Ghairi Order #'+po.no+'?'))return;try{await db.collection('poOrders').doc(id).update({status:'Cancelled'});toast('Order #'+po.no+' imeghairiwa')}catch(e){alert(e.message)}}
+function printPO(id){const o=PO.find(x=>x.id===id);if(!o)return;const N=x=>Number(x).toLocaleString('en-US'),logo=BIZ.logo||new URL('logo.png',location.href).href;
+  printDoc(`<!doctype html><html><head><meta charset="utf-8"><title>Order ${o.no}</title><style>body{font:14px Arial,sans-serif;max-width:720px;margin:0 auto;padding:14px;color:#000}.c{text-align:center}h2,h3{margin:4px 0}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #444;padding:6px;text-align:right}th,td:first-child{text-align:left}img{height:60px}@page{size:A4;margin:12mm}</style></head><body>
+  <div class="c"><img src="${logo}" alt=""><h2>${esc(BIZ.name||'LUKUBA SHOP')}</h2>${BIZ.phone?'<div>Simu: '+esc(BIZ.phone)+'</div>':''}<h3>ORDER YA MANUNUZI #${o.no}</h3></div>
+  <div>Msambazaji: <b>${esc(o.supplier)}</b></div><div>Tarehe: ${fd(dt(o))}</div><div>Imeandaliwa na: ${esc(o.by||'')}</div>
+  <table><tr><th>Bidhaa</th><th>Idadi</th><th>Bei</th><th>Jumla</th></tr>${o.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${N(i.cost)}</td><td>${N(i.qty*i.cost)}</td></tr>`).join('')}<tr><th colspan="3">JUMLA</th><th>${N(o.total)}</th></tr></table>
+  <p style="margin-top:40px">Sahihi: ____________________</p></body></html>`)}
+function poCard(o){const st={Pending:['Inasubiri mzigo','#ef6c00'],Received:['Imepokelewa','#2e7d32'],Cancelled:['Imeghairiwa','#78909c']}[o.status]||['',''];
+  return `<div class="box" style="margin:8px 0;padding:10px"><div class="row"><b>Order #${o.no} · ${esc(o.supplier)}</b><span class="tag sp" style="background:${st[1]};color:#fff">${st[0]}</span></div><div class="mu">${fd(dt(o))} · ${esc(o.by||'')}${o.status==='Received'?' · alipokea: '+esc(o.receivedBy||''):''}</div>
+  <div>${o.items.map(i=>esc(i.name)+' ×'+i.qty+' @'+TZS(i.cost)).join('<br>')}</div><div class="row"><b>${TZS(o.total)}</b><div class="sp row"><button class="b s" onclick="printPO('${o.id}')">🖨 Print</button>${o.status==='Pending'?`<button class="b g" onclick="poDone('${o.id}')">✅ Done (mzigo umepokelewa)</button><button class="b d" onclick="poCancel('${o.id}')">✖ Ghairi</button>`:''}</div></div></div>`}
+function poBox(){if(!poSub){poSub=1;unsub.push(db.collection('poOrders').orderBy('no','desc').limit(100).onSnapshot(s=>{PO=arr(s);render()},()=>permWarn('poOrders')))}
+  return `<div class="box"><h3>📝 Tengeneza Order kwa Supplier</h3><p class="mu">Order inaandaliwa kwa supplier. Bidhaa haziingii store hadi mzigo ufike na ubonyeze <b>✅ Done</b>.</p>
+  <input id="po_s" data-cb="sup" placeholder="Msambazaji (tafuta / chagua)">
+  <div class="row"><input id="po_p" data-cb="prod" placeholder="Bidhaa (tafuta / chagua)" style="flex:2"><input id="po_q" type="number" inputmode="numeric" placeholder="Idadi" style="flex:1"><input id="po_c" type="number" inputmode="decimal" placeholder="Bei ya kununua" style="flex:1"></div>
+  <button class="b s" onclick="poAdd()">+ Ongeza bidhaa</button>
+  ${poc.map((x,i)=>`<div class="row" style="padding:4px 0"><span>${esc(x.name)} ×${x.q} @${TZS(x.c)}</span><b class="sp">${TZS(x.q*x.c)}</b><button class="b d" onclick="poc.splice(${i},1);render()">✖</button></div>`).join('')}
+  ${poc.length?`<h3 style="text-align:right">Jumla: ${TZS(sum(poc,x=>x.q*x.c))}</h3><button class="b g" onclick="poSave()">Hifadhi Order</button>`:''}</div>
+  <div class="box"><h3>Orders za Supplier</h3>${PO.map(poCard).join('')||'<p class="mu">Hakuna order bado.</p>'}</div>`}
+aBuy=(o=>()=>poBox()+o())(aBuy);
 </script>
 </body>
 </html>
