@@ -157,7 +157,7 @@ if (FIREBASE_CONFIG.apiKey === 'WEKA_HAPA') {
     if (isMgr()) unsub.push(db.collection('costs').onSnapshot(s => { CST = {}; s.forEach(x => CST[x.id] = Number(x.data().cost) || 0); render(); }));
     subExtra();
     const col = db.collection('orders');
-    const src = isStaff() ? col : col.where('uid', '==', u.uid);
+    const src = (me && me.role === 'sales') ? col.where('sid', '==', u.uid) : isStaff() ? col : col.where('uid', '==', u.uid);
     unsub.push(src.onSnapshot(s => {
       s.docChanges().forEach(c => {
         if (firstO) return;
