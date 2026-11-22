@@ -157,19 +157,24 @@ if (FIREBASE_CONFIG.apiKey === 'WEKA_HAPA') {
     if (isMgr()) unsub.push(db.collection('costs').onSnapshot(s => { CST = {}; s.forEach(x => CST[x.id] = Number(x.data().cost) || 0); render(); }));
     subExtra();
     const col = db.collection('orders');
-    const src = (me && me.role === 'sales') ? col.where('sid', '==', u.uid) : isStaff() ? col : col.where('uid', '==', u.uid);
-    unsub.push(src.onSnapshot(s => {
-      s.docChanges().forEach(c => {
-        if (firstO) return;
-        const o = c.doc.data();
-        if (isStaff() && c.type === 'added') toast('Oda mpya #' + o.no + ' - ' + o.cname + ' - ' + TZS(o.total));
-        if (!isStaff() && c.type === 'modified') toast('Oda #' + o.no + ': ' + SW[o.status]);
-      });
-      firstO = false;
-      const arr = s.docs.map(x => ({ id: x.id, ...x.data() })).sort((a, b) => b.no - a.no);
-      if (isStaff()) allO = arr; else myO = arr;
-      render();
-    }));
+    const srcs = (me && me.role === 'sales') ? [col.where('sid', '==', u.uid), col.where('sid', '==', '')] : [isStaff() ? col : col.where('uid', '==', u.uid)];
+    const store = {};
+    srcs.forEach((src, ix) => {
+      let first = true;
+      unsub.push(src.onSnapshot(s => {
+        s.docChanges().forEach(c => {
+          if (first) return;
+          const o = c.doc.data();
+          if (isStaff() && c.type === 'added' && o.sid !== u.uid) toast('Oda mpya #' + o.no + ' - ' + o.cname + ' - ' + TZS(o.total));
+          if (!isStaff() && c.type === 'modified') toast('Oda #' + o.no + ': ' + SW[o.status]);
+        });
+        first = false;
+        store[ix] = s.docs.map(x => ({ id: x.id, ...x.data() }));
+        const arr = [].concat(...Object.values(store)).sort((a, b) => b.no - a.no);
+        if (isStaff()) allO = arr; else myO = arr;
+        render();
+      }, e => permWarn('orders')));
+    });
     try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
     view = isStaff() ? 'admin' : 'shop'; render();
   });
@@ -273,7 +278,7 @@ async function placeOrder() {
       snaps.forEach((s, k) => t.update(refs[k], { stock: s.data().stock - cart[ids[k]] }));
       t.set(cref, { n: no });
       t.set(oref, { no, uid: me.id, cname: me.name, phone: me.phone || '', items, total: items.reduce((a, i) => a + i.price * i.qty, 0),
-        method, addr, note, status: 'Pending', paid: 0, payStatus: 'none', branch: '', at: firebase.firestore.FieldValue.serverTimestamp() });
+        method, addr, note, status: 'Pending', paid: 0, payStatus: 'none', sid: '', branch: '', at: firebase.firestore.FieldValue.serverTimestamp() });
     });
     cart = {}; saveCart(); view = 'orders'; render(); toast('Oda #' + no + ' imetumwa. Subiri uthibitisho.');
   } catch (e) { alert(e.message); const b = $('#pb'); if (b) b.disabled = false; }
@@ -283,7 +288,7 @@ function oCard(o, staff) {
   const nx = ST.filter(s => s !== o.status);
   return `<div class="box st-${o.status}"><div class="row"><b>Oda #${o.no}</b><span class="tag">${SW[o.status]} (${o.status})</span>
   <span class="mu sp">${o.at?.toDate ? o.at.toDate().toLocaleString('sw-TZ') : ''}</span></div>
-  ${staff ? `<div>👤 ${esc(o.cname)} · 📞 ${esc(o.phone)}</div>` : ''}${staff && (o.seller || o.cashier) ? `<div class="mu">🧑‍💼 Mhudumu (sales): ${esc(o.seller || '—')}${o.cashier ? ' · 💵 Cashier: ' + esc(o.cashier) : ''}</div>` : ''}
+  ${staff ? `<div>👤 ${esc(o.cname)} · 📞 ${esc(o.phone)}</div>` : ''}${staff && (o.seller || o.cashier) ? `<div class="mu">🧑‍💼 Mhudumu (sales): ${esc(o.seller || '—')}${o.cashier ? ' · 💵 Cashier: ' + esc(o.cashier) : ''}</div>` : ''}${me && me.role === 'sales' && !o.sid && o.status !== 'Cancelled' ? `<div class="row"><span class="mu">🆕 Oda ya mteja wa mtandaoni, bado haijachukuliwa</span><button class="b g" onclick="claimOrder('${o.id}')">📤 Tuma kwa Cashier</button></div>` : ''}
   <div class="mu">${o.method === 'delivery' ? '🚚 Delivery: ' + esc(o.addr) : '🏪 Kuchukua dukani'}${o.note ? ' · ' + esc(o.note) : ''}</div>
   <table>${o.items.map(i => `<tr><td>${esc(i.name)}</td><td>${i.qty} × ${TZS(i.price)}</td><td>${TZS(i.qty * i.price)}</td></tr>`).join('')}</table>
   <h4 style="text-align:right;margin:6px 0">Jumla: ${TZS(o.total)}</h4>${payInfo(o)}
@@ -1023,6 +1028,13 @@ function poBox(){if(!poSub){poSub=1;unsub.push(db.collection('poOrders').orderBy
   ${poc.length?`<h3 style="text-align:right">Jumla: ${TZS(sum(poc,x=>x.q*x.c))}</h3><button class="b g" onclick="poSave()">Hifadhi Order</button>`:''}</div>
   <div class="box"><h3>Orders za Supplier</h3>${PO.map(poCard).join('')||'<p class="mu">Hakuna order bado.</p>'}</div>`}
 aBuy=(o=>()=>poBox()+o())(aBuy);
+
+/* ===== Oda ya mteja wa mtandaoni: sales yeyote anaiona; aliyeituma kwa cashier ndiye anayebaki nayo ===== */
+async function claimOrder(id){if(!await ask('Tuma oda hii kwa cashier? Itahamia kwenye akaunti yako na sales wengine hawataiona tena.'))return;
+  try{let no=0;await db.runTransaction(async t=>{const r=db.collection('orders').doc(id),o=(await t.get(r)).data();
+    if(!o)throw new Error('Oda haipo');if(o.sid&&o.sid!==me.id)throw new Error('Oda hii imeshachukuliwa na '+(o.seller||'sales mwingine'));if(o.status==='Cancelled')throw new Error('Oda hii imefutwa');
+    no=o.no;t.update(r,{sid:me.id,seller:me.name,status:o.status==='Pending'?'Confirmed':o.status,payStatus:(o.payStatus&&o.payStatus!=='none')?o.payStatus:'awaiting',branch:o.branch||me.branch||''})});
+    toast('Oda #'+no+' imetumwa kwa cashier na sasa iko kwenye akaunti yako')}catch(e){alert(e.message)}}
 </script>
 </body>
 </html>
