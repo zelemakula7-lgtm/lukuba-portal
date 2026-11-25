@@ -1149,5 +1149,41 @@ async function subStock(id){const v=await stockAsk(id,'Punguza');if(!(v>0))retur
 /* Bei kamili ya pcs = bei ya Ctn ÷ idadi (haizungushwi), ili Ctn nzima iwe bei yake halisi (mf. 10,000) */
 function PP(p){const u=p&&p.pk&&p.pk.u;return u&&u.length>1&&p.pk.bp?p.pk.bp/u[u.length-1].q:p.price}
 </script>
+<script>
+/* ===== TOLEO 4: akaunti ya mteja yenye password moja (Boss/Meneja wanaiweka), Boss+Meneja kusimamia wafanyakazi ===== */
+const CUST_DOM='cust.lukuba.app';
+let CPW='';
+/* kuingia: email, au jina (mfanyakazi, kisha mteja) */
+async function doLogin(){const v=$('#em').value.trim(),pw=$('#pw').value;
+  if(v.includes('@')){try{await auth.signInWithEmailAndPassword(v,pw)}catch(e){authErr(e)}return}
+  try{await auth.signInWithEmailAndPassword(toEmail(v),pw)}
+  catch(e){if(['auth/invalid-credential','auth/user-not-found','auth/invalid-login-credentials'].includes(e.code)){
+    try{await auth.signInWithEmailAndPassword(slug(v)+'@'+CUST_DOM,pw)}catch(x){authErr(x)}}else authErr(e)}}
+vAuth=(o=>()=>o().replace('Email au jina la kuingia (mfanyakazi)','Email au jina lako la kuingia'))(vAuth);
+/* Boss/Meneja wanaweka password moja ya wateja; staff wanaisoma wakati wa kufungua akaunti */
+subExtra=(o=>function(){o();if(isStaff())unsub.push(db.collection('secrets').doc('custPw').onSnapshot(d=>{CPW=d.exists?(d.data().pw||''):'';render()},()=>{}))})(subExtra);
+async function saveCustPw(){const v=$('#cpw').value.trim();if(v.length<6)return alert('Password iwe herufi 6 au zaidi');
+  try{await db.collection('secrets').doc('custPw').set({pw:v,by:me.name||'',at:SV()});toast('Password ya wateja imehifadhiwa')}catch(e){alert(e.message)}}
+/* kusajili mteja dukani, kwa hiari kumfungulia akaunti */
+async function addCus(){const n=$('#c_n').value.trim(),ph=$('#c_p').value.trim(),acc=$('#c_acc')&&$('#c_acc').checked;
+  if(!n)return alert('Andika jina');if(byName(CL(),n))return alert('Mteja huyu yupo tayari');
+  if(!acc){try{await db.collection('customers').add({name:n,phone:ph,at:SV()});clr(['c_n','c_p']);toast('Mteja ameongezwa: '+n)}catch(e){alert(e.message)}return}
+  const un=slug(n);if(un.length<3)return alert('Jina liwe na herufi 3+ (a-z au namba)');
+  if(CPW.length<6)return alert('Boss au Meneja aweke "Password ya wateja" kwanza (sehemu ya Wateja).');
+  try{const a2=(firebase.apps.find(a=>a.name==='sec')||firebase.initializeApp(FIREBASE_CONFIG,'sec')).auth();let u;
+    try{u=(await a2.createUserWithEmailAndPassword(un+'@'+CUST_DOM,CPW)).user.uid}
+    catch(e){if(e.code==='auth/email-already-in-use')throw new Error('Jina "'+n+'" tayari limetumika kwa akaunti nyingine. Ongeza herufi au namba kwenye jina.');throw e}
+    await db.collection('users').doc(u).set({name:n,phone:ph,email:un+'@'+CUST_DOM,uname:un,role:'customer'});
+    await a2.signOut();clr(['c_n','c_p']);toast('Akaunti ya '+n+' imefunguliwa. Anaingia kwa jina: '+un)}
+  catch(e){alert('Imeshindwa: '+e.message)}}
+aCust=(o=>()=>{let h=o();
+  h=h.replace('<button class="b" onclick="addCus()">Hifadhi</button>','<label class="mu" style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="c_acc" style="width:auto;margin:0"> Mfungulie akaunti ya kuingia (jina + password ya wateja)</label><button class="b" onclick="addCus()">Hifadhi</button>');
+  if(isMgr())h=`<div class="box"><h3>🔑 Password ya wateja (moja kwa wote)</h3><p class="mu">Wateja wote wanaofunguliwa akaunti wanatumia password hii; jina lao ndilo linawatofautisha. Kubadilisha hapa hakuathiri akaunti zilizokwisha funguliwa.</p><input id="cpw" type="text" placeholder="Password ya wateja (herufi 6+)" value="${esc(CPW)}"><button class="b" onclick="saveCustPw()">Hifadhi password</button></div>`+h;
+  return h})(aCust);
+/* mteja anaweza kubadili password yake (Oda zangu) */
+vOrders=(o=>()=>(isStaff()?'':`<div class="box"><h3>🔑 Badilisha password</h3><input id="pw1" type="password" placeholder="Password mpya (herufi 6+)" autocomplete="new-password"><input id="pw2" type="password" placeholder="Rudia password mpya" autocomplete="new-password"><button class="b g" onclick="changePw()">Hifadhi password</button></div>`)+o())(vOrders);
+/* Meneja pia anaweza kutengeneza akaunti ya Manager */
+aStaff=(o=>()=>{let h=o();if(!h.includes('value="manager">Manager'))h=h.replace('<option value="operator">Operator</option>','<option value="operator">Operator</option><option value="manager">Manager</option>');return h})(aStaff);
+</script>
 </body>
 </html>
