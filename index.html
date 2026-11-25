@@ -47,6 +47,11 @@ table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px so
 .box h3{color:var(--n)}.box{border-top:3px solid var(--tm,#8fd8d2)}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--t);border-color:var(--t)}
 .pt th{color:var(--n)}a{color:var(--t)}
+.pl .plt{display:flex;gap:12px;align-items:flex-start}.pl img,.plph{width:112px;height:112px;object-fit:contain;background:#fff;border:1px solid #e3e9f0;border-radius:10px;flex:none}
+.plph{display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--m);text-align:center}.pli{min-width:0;flex:1}
+.pln{font-size:18px;font-weight:700;line-height:1.25;color:var(--n);word-break:break-word}.plr{font-size:15.5px;line-height:1.45;margin-top:3px}.pl .mu{font-size:14px}
+.plb{margin-top:12px;gap:8px}.plb .b{flex:1;padding:11px 6px;font-size:15px}
+.card img{object-fit:contain;background:#fff;border:1px solid #e3e9f0}.card b{font-size:16.5px}.card .pr{font-size:18px}.card .mu{font-size:14px}
 </style>
 
 <style id="ui2">
@@ -371,10 +376,11 @@ function aProd() {
   return stats + editBox + `<div class="box"><h3>Ongeza bidhaa</h3><input id="pn" placeholder="Jina la bidhaa"><input id="pc" placeholder="Category"><input id="pd" placeholder="Maelezo">
   ${pkForm('p',null)}
   <input id="pi" type="file" accept="image/*"><button class="b" id="sb" onclick="addProd()">Hifadhi bidhaa</button></div>` +
-    l.map(p => `<div class="box row">${p.img ? `<img src="${p.img}" style="width:60px;height:60px;object-fit:cover;border-radius:8px">` : ''}
-    <div><b>${esc(p.name)}</b> ${p.active ? '' : '<span class="tag oos">Imefichwa</span>'}<div class="mu">${esc(p.category || '')} · Kuuza ${priceTxt(p)}${CST[p.id] ? ' · Kununua ' + (p.pk ? TZS(CST[p.id] * UN(p)[UN(p).length - 1].q) + '/' + UN(p)[UN(p).length - 1].n : TZS(CST[p.id])) : ''} · Stock: ${stockTxt(p)}</div></div>
-    <div class="sp row"><button class="b s" onclick="editId='${p.id}';render();scrollTo(0,0)">Hariri</button><button class="b s" onclick="subStock('${p.id}')">− Stock</button><button class="b s" onclick="addStock('${p.id}')">+ Stock</button>
-    <button class="b d" onclick="delProd('${p.id}')">Futa</button></div></div>`).join('');
+    l.map(p => { const u = UN(p), big = u[u.length - 1]; return `<div class="box pl"><div class="plt">${p.img ? `<img src="${p.img}" alt="">` : '<div class="plph">Hakuna picha</div>'}
+    <div class="pli"><div class="pln">${esc(p.name)} ${p.active ? '' : '<span class="tag oos">Imefichwa</span>'}</div>${p.category ? `<div class="mu">${esc(p.category)}</div>` : ''}
+    <div class="plr">Kuuza: <b>${priceTxt(p)}</b></div>${CST[p.id] ? `<div class="plr">Kununua: <b>${p.pk ? TZS(CST[p.id] * big.q) + ' / ' + esc(big.n) : TZS(CST[p.id])}</b></div>` : ''}
+    <div class="plr">Stock: <b>${stockTxt(p)}</b></div></div></div>
+    <div class="row plb"><button class="b s" onclick="editId='${p.id}';render();scrollTo(0,0)">Hariri</button><button class="b s" onclick="subStock('${p.id}')">− Stock</button><button class="b s" onclick="addStock('${p.id}')">+ Stock</button><button class="b d" onclick="delProd('${p.id}')">Futa</button></div></div>`; }).join('');
 }
 async function saveEdit() {
   const id = editId, n = $('#e_n').value.trim(), pr = Number($('#e_p').value), st = parseInt($('#e_s').value), co = Number($('#e_k').value || 0);
