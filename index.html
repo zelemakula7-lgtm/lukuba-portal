@@ -373,14 +373,14 @@ function aProd() {
   <input id="e_i" type="file" accept="image/*">
   <label class="row"><input id="e_a" type="checkbox" style="width:auto" ${e.active ? 'checked' : ''}> Onyesha kwa wateja</label>
   <div class="row"><button class="b g" id="eb" onclick="saveEdit()">Hifadhi mabadiliko</button><button class="b s" onclick="editId=null;render()">Ghairi</button></div></div>` : '';
-  return stats + editBox + `<div class="box"><h3>Ongeza bidhaa</h3><input id="pn" placeholder="Jina la bidhaa"><input id="pc" placeholder="Category"><input id="pd" placeholder="Maelezo">
+  return stats + `<div class="box"><h3>Ongeza bidhaa</h3><input id="pn" placeholder="Jina la bidhaa"><input id="pc" placeholder="Category"><input id="pd" placeholder="Maelezo">
   ${pkForm('p',null)}
   <input id="pi" type="file" accept="image/*"><button class="b" id="sb" onclick="addProd()">Hifadhi bidhaa</button></div>` +
     l.map(p => { const u = UN(p), big = u[u.length - 1]; return `<div class="box pl"><div class="plt">${p.img ? `<img src="${p.img}" alt="">` : '<div class="plph">Hakuna picha</div>'}
     <div class="pli"><div class="pln">${esc(p.name)} ${p.active ? '' : '<span class="tag oos">Imefichwa</span>'}</div>${p.category ? `<div class="mu">${esc(p.category)}</div>` : ''}
-    <div class="plr">Kuuza: <b>${priceTxt(p)}</b></div>${CST[p.id] ? `<div class="plr">Kununua: <b>${p.pk ? TZS(CST[p.id] * big.q) + ' / ' + esc(big.n) : TZS(CST[p.id])}</b></div>` : ''}
+    <div class="plr">Kuuza: ${priceTxt(p)}</div>${CST[p.id] ? `<div class="plr">Kununua: <b>${p.pk ? TZS(CST[p.id] * big.q) + ' / ' + esc(big.n) : TZS(CST[p.id])}</b></div>` : ''}
     <div class="plr">Stock: <b>${stockTxt(p)}</b></div></div></div>
-    <div class="row plb"><button class="b s" onclick="editId='${p.id}';render();scrollTo(0,0)">Hariri</button><button class="b s" onclick="subStock('${p.id}')">− Stock</button><button class="b s" onclick="addStock('${p.id}')">+ Stock</button><button class="b d" onclick="delProd('${p.id}')">Futa</button></div></div>`; }).join('');
+    <div class="row plb"><button class="b s" onclick="editId=editId==='${p.id}'?null:'${p.id}';render();setTimeout(()=>{const x=editId&&document.querySelector('.box.edit');x&&x.scrollIntoView({block:'start'})},60)">${editId===p.id?'Funga':'Hariri'}</button><button class="b s" onclick="subStock('${p.id}')">− Stock</button><button class="b s" onclick="addStock('${p.id}')">+ Stock</button><button class="b d" onclick="delProd('${p.id}')">Futa</button></div>${editId===p.id?editBox:''}</div>`; }).join('');
 }
 async function saveEdit() {
   const id = editId, n = $('#e_n').value.trim(), pr = Number($('#e_p').value), st = parseInt($('#e_s').value), co = Number($('#e_k').value || 0);
@@ -1049,7 +1049,7 @@ selU=id=>{const u=MU(P[id],id);return u[Math.min(usel[id]||0,u.length-1)]},
 brk=(n,u)=>{if(!u||u.length<2)return String(n);let r=n;const o=[];[...u].reverse().forEach(x=>{const c=Math.floor(r/x.q);if(c>0){o.push(c+' '+x.n);r-=c*x.q}});return o.join(', ')||'0'},
 pkf=p=>UN(p).length>1?{pk:UN(p).map(x=>({n:x.n,q:x.q}))}:{},
 stockTxt=p=>brk(Number(p.stock)||0,UN(p)),
-priceTxt=p=>UN(p).length<2?TZS(p.price):[...UN(p)].reverse().map(x=>x.n+' '+TZS(p.price*x.q)).join(' · '),
+priceTxt=p=>UN(p).length<2?TZS(p.price):[...UN(p)].reverse().map(x=>x.q>1?'<b>'+esc(x.n)+' '+TZS(p.price*x.q)+'</b>':x.n+' '+TZS(p.price*x.q)).join(' · '),
 lineParts=i=>{const u=i.pk;if(!u||u.length<2)return[{name:i.name,qty:i.qty,price:i.price,total:Math.round(i.qty*i.price)}];let r=i.qty;const o=[];[...u].reverse().forEach(x=>{const c=Math.floor(r/x.q);if(c>0){o.push({name:i.name+' ('+x.n+')',qty:c,price:Math.round(i.price*x.q),total:Math.round(c*x.q*i.price)});r-=c*x.q}});return o},
 unitSel=(id,p,full)=>{const u=UN(p);if(u.length<2)return'';const j=umode[id]==='j',m=MU(p,id),pr=x=>full?' · '+TZS(p.price*x.q):'',nm=x=>esc(x.n)+(x.q>1?' ('+x.q+')':'');
   return `<div class="row" style="margin:4px 0;gap:6px"><select onchange="umode['${id}']=this.value;usel['${id}']=0;render()" style="width:auto;margin:0"><option value="r" ${j?'':'selected'}>Rejareja</option><option value="j" ${j?'selected':''}>Jumla</option></select>`+
@@ -1113,7 +1113,7 @@ function vShop(){
   <div class="grid">${list.map(p=>{const u=UN(p);return `<div class="card">${p.img?`<img src="${p.img}" alt="">`:'<div class="ph">Hakuna picha</div>'}
   <div style="margin-top:6px"><b>${esc(p.name)}</b></div><div class="mu">${esc(p.desc||'')}</div>
   <div class="pr">${TZS(p.price)}${u.length>1?` <span class="mu">/ ${esc(u[0].n)}</span>`:''}</div>
-  ${u.length>1?`<div class="mu">${[...u].slice(1).reverse().map(x=>esc(x.n)+' '+TZS(p.price*x.q)).join(' · ')}</div>`:''}
+  ${u.length>1?`<div class="mu">${[...u].slice(1).reverse().map(x=>'<b style="color:#111">'+esc(x.n)+' '+TZS(p.price*x.q)+'</b>').join(' · ')}</div>`:''}
   <div style="margin:6px 0">${p.stock>0?'<span class="tag in">Ipo</span>':'<span class="tag oos">OUT OF STOCK</span>'}</div>
   ${unitSel(p.id,p,1)}
   <button class="b" style="width:100%" ${p.stock>0?'':'disabled'} onclick="addCart('${p.id}')">${p.stock>0?'Weka kwenye cart':'Imeisha'}</button></div>`}).join('')||'<p class="mu">Hakuna bidhaa.</p>'}</div>${bizFooter()}`}
@@ -1122,11 +1122,18 @@ function addCart(id){const p=P[id];if(!p||p.stock<1)return;const u=selU(id);
   cart[id]=(cart[id]||0)+u.q;saveCart();render();toast(p.name+' ('+u.n+') imeongezwa')}
 function chQty(id,d){const p=P[id],n=(cart[id]||0)+d*selU(id).q;
   if(n<=0)delete cart[id];else if(p&&n>p.stock)return toast('Zilizobaki ni '+stockTxt(p)+' tu');else cart[id]=n;saveCart();render()}
+function setQty(id,v){const p=P[id],u=selU(id),x=Number(v);
+  if(!p||!(x>=0)){return render()}
+  const n=Math.floor(x*u.q+1e-9);
+  if(n<=0)delete cart[id];
+  else if(n>p.stock){cart[id]=p.stock-(p.stock%u.q||0)||p.stock;toast('Zilizobaki ni '+stockTxt(p)+' tu')}
+  else cart[id]=n;
+  saveCart();render()}
 function vCart(){
   const ids=Object.keys(cart).filter(i=>P[i]);if(!ids.length)return '<div class="box">Cart yako ni tupu.</div>';
   const tot=Math.round(ids.reduce((a,i)=>a+P[i].price*cart[i],0));
   return `<div class="box">${ids.map(i=>`<div class="row" style="padding:6px 0;border-bottom:1px solid #e3e9f0"><div><b>${esc(P[i].name)}</b><div class="mu">${priceTxt(P[i])} · Zilizopo: ${stockTxt(P[i])}${P[i].stock<cart[i]||!P[i].active?' <span style="color:var(--r)">(stock haitoshi)</span>':''}</div></div>
-  <div class="sp row">${unitSel(i,P[i])}<button class="b s" onclick="chQty('${i}',-1)">−</button><b>${brk(cart[i],UN(P[i]))}</b><button class="b s" onclick="chQty('${i}',1)">+</button><b style="min-width:100px;text-align:right">${TZS(P[i].price*cart[i])}</b></div></div>`).join('')}
+  <div class="sp row">${unitSel(i,P[i])}<button class="b s" onclick="chQty('${i}',-1)">−</button><input type="number" inputmode="numeric" min="0" step="any" value="${Math.round(cart[i]/selU(i).q*100)/100}" onchange="setQty('${i}',this.value)" style="width:72px;text-align:center;margin:0"><button class="b s" onclick="chQty('${i}',1)">+</button>${UN(P[i]).length>1?`<span class="mu">${brk(cart[i],UN(P[i]))}</span>`:''}<b style="min-width:100px;text-align:right">${TZS(P[i].price*cart[i])}</b></div></div>`).join('')}
   <h3 style="text-align:right">Jumla: ${TZS(tot)}</h3>
   ${me?`<select id="m" onchange="$('#adw').style.display=this.value==='delivery'?'block':'none'"><option value="pickup">Nitajichukulia dukani</option><option value="delivery">Naomba delivery</option></select>
   <div id="adw" style="display:none"><input id="ad" placeholder="Anwani ya delivery (eneo, mtaa, alama)"></div>
