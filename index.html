@@ -1049,7 +1049,7 @@ selU=id=>{const u=MU(P[id],id);return u[Math.min(usel[id]||0,u.length-1)]},
 brk=(n,u)=>{if(!u||u.length<2)return String(n);let r=n;const o=[];[...u].reverse().forEach(x=>{const c=Math.floor(r/x.q);if(c>0){o.push(c+' '+x.n);r-=c*x.q}});return o.join(', ')||'0'},
 pkf=p=>UN(p).length>1?{pk:UN(p).map(x=>({n:x.n,q:x.q}))}:{},
 stockTxt=p=>brk(Number(p.stock)||0,UN(p)),
-priceTxt=p=>UN(p).length<2?TZS(p.price):[...UN(p)].reverse().map(x=>x.q>1?'<b>'+esc(x.n)+' '+TZS(p.price*x.q)+'</b>':x.n+' '+TZS(p.price*x.q)).join(' · '),
+priceTxt=p=>UN(p).length<2?TZS(p.price):(U=>[...U].reverse().map(x=>x===U[U.length-1]?'<b>'+esc(x.n)+' '+TZS(p.price*x.q)+'</b>':esc(x.n)+' '+TZS(p.price*x.q)).join(' · '))(UN(p)),
 lineParts=i=>{const u=i.pk;if(!u||u.length<2)return[{name:i.name,qty:i.qty,price:i.price,total:Math.round(i.qty*i.price)}];let r=i.qty;const o=[];[...u].reverse().forEach(x=>{const c=Math.floor(r/x.q);if(c>0){o.push({name:i.name+' ('+x.n+')',qty:c,price:Math.round(i.price*x.q),total:Math.round(c*x.q*i.price)});r-=c*x.q}});return o},
 unitSel=(id,p,full)=>{const u=UN(p);if(u.length<2)return'';const j=umode[id]==='j',m=MU(p,id),pr=x=>full?' · '+TZS(p.price*x.q):'',nm=x=>esc(x.n)+(x.q>1?' ('+x.q+')':'');
   return `<div class="row" style="margin:4px 0;gap:6px"><select onchange="umode['${id}']=this.value;usel['${id}']=0;render()" style="width:auto;margin:0"><option value="r" ${j?'':'selected'}>Rejareja</option><option value="j" ${j?'selected':''}>Jumla</option></select>`+
@@ -1112,8 +1112,8 @@ function vShop(){
   <select onchange="cat=this.value;render()" style="flex:1"><option value="">Category zote</option>${cats.map(c=>`<option ${c===cat?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
   <div class="grid">${list.map(p=>{const u=UN(p);return `<div class="card">${p.img?`<img src="${p.img}" alt="">`:'<div class="ph">Hakuna picha</div>'}
   <div style="margin-top:6px"><b>${esc(p.name)}</b></div><div class="mu">${esc(p.desc||'')}</div>
-  <div class="pr">${TZS(p.price)}${u.length>1?` <span class="mu">/ ${esc(u[0].n)}</span>`:''}</div>
-  ${u.length>1?`<div class="mu">${[...u].slice(1).reverse().map(x=>'<b style="color:#111">'+esc(x.n)+' '+TZS(p.price*x.q)+'</b>').join(' · ')}</div>`:''}
+  ${u.length>1?`<div class="pr">${esc(u[u.length-1].n)} ${TZS(p.price*u[u.length-1].q)}</div>
+  <div class="mu" style="font-weight:400">${[...u].slice(0,-1).reverse().map(x=>esc(x.n)+' '+TZS(p.price*x.q)).join(' · ')}</div>`:`<div class="pr">${TZS(p.price)}</div>`}
   <div style="margin:6px 0">${p.stock>0?'<span class="tag in">Ipo</span>':'<span class="tag oos">OUT OF STOCK</span>'}</div>
   ${unitSel(p.id,p,1)}
   <button class="b" style="width:100%" ${p.stock>0?'':'disabled'} onclick="addCart('${p.id}')">${p.stock>0?'Weka kwenye cart':'Imeisha'}</button></div>`}).join('')||'<p class="mu">Hakuna bidhaa.</p>'}</div>${bizFooter()}`}
