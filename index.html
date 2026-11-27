@@ -1192,5 +1192,123 @@ vOrders=(o=>()=>(isStaff()?'':`<div class="box"><h3>🔑 Badilisha password</h3>
 /* Meneja pia anaweza kutengeneza akaunti ya Manager */
 aStaff=(o=>()=>{let h=o();if(!h.includes('value="manager">Manager'))h=h.replace('<option value="operator">Operator</option>','<option value="operator">Operator</option><option value="manager">Manager</option>');return h})(aStaff);
 </script>
+<script>
+/* ===== DELIVERY (kutoka MAKULA SYSTEM, imeunganishwa na Firebase ya LUKUBA) ===== */
+let DLV=[],DRV=[],dv={drv:'',date:'',cart:[],batch:[]},dvF='zote',dvView=null,dvComp=null;
+const dvN=x=>Number(x||0).toLocaleString('en-US'),dvDate=()=>new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+const DV_ST=['Inasubiri','Njiani','Imefikishwa','Imeghairiwa'],DV_COL={Inasubiri:'#b7791f',Njiani:'#1d4ed8',Imefikishwa:'#15803d',Imeghairiwa:'#b91c1c'};
+TL.dlv='🚚 Delivery';['cashier','sales','driver'].forEach(r=>{if(RT[r]&&!RT[r].includes('dlv'))RT[r].splice(Math.max(0,RT[r].length-1),0,'dlv')});
+subExtra=(o=>function(){o();if(!isStaff())return;
+  unsub.push(db.collection('deliveries').onSnapshot(s=>{DLV=s.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>String(b.no).localeCompare(String(a.no)));render()},()=>permWarn('deliveries')));
+  unsub.push(db.collection('users').where('role','in',['boss','manager','cashier','sales','driver','operator']).onSnapshot(s=>{DRV=s.docs.map(x=>({id:x.id,name:x.data().name||'',phone:x.data().phone||''})).sort((a,b)=>a.name.localeCompare(b.name));render()},()=>{}))})(subExtra);
+function vAdmin(){
+  if(!isStaff())return '<div class="box">Huna ruhusa.</div>';
+  const T=isMgr()?['dash','orders','pay','pos','dlv','debt','prod','buy','sup','exp','sal','staff','br','rep','cust','top','db','biz','me']:(RT[me.role]||['orders','me']);
+  if(!seen){seen=1;tab=T[0]}if(!T.includes(tab))tab=T[0];
+  const F={dash:aDash,orders:aOrders,pay:aPay,pos:aPos,dlv:aDlv,debt:aDebt,prod:aProd,buy:aBuy,sup:aSup,exp:()=>aMoney('expenses','Matumizi'),sal:aSal,staff:aStaff,br:aBr,rep:aRep,cust:aCust,top:aTop,biz:aBiz,db:aDb,mine:aMine,me:aMe};
+  return `<div class="row tabs" style="margin-bottom:10px">${T.map(t=>`<button class="b ${tab===t?'':'s'}" onclick="tab='${t}';render()">${TL[t]}</button>`).join('')}</div>`+F[tab]();
+}
+const dvPs=()=>Object.values(P).filter(p=>p.active!==false);
+const dvUsed=id=>sum(dv.cart.filter(i=>i.id===id),i=>i.qty)+sum(dv.batch,c=>sum(c.items.filter(i=>i.id===id),i=>i.qty));
+const dvDrvOpts=sel=>'<option value="">-- Chagua anayepeleka (dereva/mfanyakazi) --</option>'+DRV.map(e=>`<option value="${e.id}" ${sel===e.id?'selected':''}>${esc(e.name)}${e.phone?' ('+esc(e.phone)+')':''}</option>`).join('');
+const dvBadge=s=>`<span class="tag" style="background:${DV_COL[s]||'#555'};color:#fff">${esc(s)}</span>`;
+const dvItemsTxt=items=>items.map(i=>esc(i.name)+' ×'+brk(i.qty,i.pk)).join(', ');
+function dvPick(){const p=byName(dvPs(),$('#dv_p').value),us=$('#dv_u');if(!p){us.innerHTML='';$('#dv_hint').textContent='';return}
+  us.innerHTML=UN(p).map((x,k)=>`<option value="${k}">${esc(x.n)}${x.q>1?' ('+x.q+')':''}</option>`).join('');us.value=0;$('#dv_pr').value=Math.round(PP(p));$('#dv_hint').textContent='Stock: '+stockTxt(p)}
+function dvUnit(){const p=byName(dvPs(),$('#dv_p').value);if(!p)return;$('#dv_pr').value=Math.round(PP(p)*UN(p)[+$('#dv_u').value||0].q)}
+function dvCust(){const c=byName(CL(),$('#dv_cn').value);if(!c)return;if(!$('#dv_cp').value)$('#dv_cp').value=c.phone||'';if(!$('#dv_ca').value)$('#dv_ca').value=c.addr||''}
+function dvAddItem(){const p=byName(dvPs(),$('#dv_p').value);if(!p)return alert('Chagua bidhaa kutoka kwenye orodha');
+  const x=UN(p)[+$('#dv_u').value||0],n=parseFloat($('#dv_q').value),pr=parseFloat($('#dv_pr').value);
+  if(!(n>0)||!(pr>=0))return alert('Weka idadi na bei sahihi');const qty=Math.round(n*x.q);if(qty<1)return alert('Idadi ni ndogo sana');
+  const used=dvUsed(p.id);if(used+qty>p.stock)return alert('Stock haitoshi: "'+p.name+'" ipo '+stockTxt(p)+(used?' (tayari '+brk(used,UN(p))+' kwenye delivery hii)':''));
+  dv.cart.push({id:p.id,name:p.name,price:pr/x.q,qty,...pkf(p)});clr(['dv_p','dv_q','dv_pr']);render()}
+function dvAddCust(){const name=$('#dv_cn').value.trim(),addr=$('#dv_ca').value.trim();
+  if(!name)return alert('Weka jina la mteja');if(!addr)return alert('Weka anwani / mahali pa kupeleka bidhaa');if(!dv.cart.length)return alert('Ongeza angalau bidhaa moja kwa mteja huyu');
+  const c=byName(CL(),name),sub=sum(dv.cart,i=>i.price*i.qty),d=Math.max(0,Math.min(parseFloat($('#dv_cd').value)||0,sub));
+  dv.batch.push({cid:c?c.id:'',name,phone:$('#dv_cp').value.trim(),addr,items:dv.cart.slice(),sub,disc:d,total:sub-d,drv:'',drvName:'',drvPhone:''});
+  dv.cart=[];clr(['dv_cn','dv_cp','dv_ca','dv_cd']);clrcb('cust');render()}
+function dvSetBatchDrv(i,id){const e=DRV.find(x=>x.id===id)||{};Object.assign(dv.batch[i],{drv:id,drvName:e.name||'',drvPhone:e.phone||''});render()}
+function dvRemBatch(i){dv.batch.splice(i,1);render()}
+async function dvFinal(){if(!dv.drv)return alert('Chagua atakayepeleka bidhaa (dereva/mfanyakazi)');if(!dv.batch.length)return alert('Ongeza angalau mteja mmoja');
+  const need={};dv.batch.forEach(c=>c.items.forEach(i=>need[i.id]=(need[i.id]||0)+i.qty));
+  const dr=DRV.find(x=>x.id===dv.drv)||{},ids=Object.keys(need);let no='',rec=null;
+  try{const cref=db.collection('meta').doc('dlvcounter'),dref=db.collection('deliveries').doc(),refs=ids.map(i=>db.collection('products').doc(i));
+    await db.runTransaction(async t=>{const cs=await t.get(cref),sn=await Promise.all(refs.map(r=>t.get(r))),n=(cs.exists?cs.data().n:0)+1;no='DLV-'+String(n).padStart(4,'0');
+      sn.forEach((s,k)=>{if(!s.exists||s.data().stock<need[ids[k]])throw new Error('"'+(s.exists?s.data().name:'Bidhaa')+'" haitoshi stock')});
+      sn.forEach((s,k)=>t.update(refs[k],{stock:s.data().stock-need[ids[k]]}));t.set(cref,{n});
+      rec={no,date:dv.date||dvDate(),drvId:dv.drv,drvName:dr.name||'',drvPhone:dr.phone||'',status:'Inasubiri',branch:me.branch||'',by:me.name||'',
+        customers:dv.batch.map((c,i)=>({...c,inv:no+'-'+(i+1),drv:c.drv||dv.drv,drvName:c.drvName||dr.name||'',drvPhone:c.drvPhone||dr.phone||'',paid:0,balance:Math.round(c.total),pst:'Haijalipwa',oid:null})),grand:Math.round(sum(dv.batch,c=>c.total))};
+      t.set(dref,{...rec,at:SV()})});
+    logAct('Delivery '+no+' imeundwa (wateja '+dv.batch.length+')');dv.batch=[];dv.cart=[];dv.drv='';dv.date='';render();toast('Delivery '+no+' imehifadhiwa');dvPrintBatch(rec)}catch(e){alert('Imeshindwa: '+e.message)}}
+async function dvRestore(items){const m={};items.forEach(i=>m[i.id]=(m[i.id]||0)+i.qty);
+  await Promise.allSettled(Object.keys(m).map(id=>db.collection('products').doc(id).update({stock:firebase.firestore.FieldValue.increment(m[id])})))}
+const dvAllItems=d=>d.customers.flatMap(c=>c.items);
+async function dvStatus(id,s){const d=DLV.find(x=>x.id===id);if(!d)return;
+  if(s==='Imeghairiwa'){if(['Imefikishwa','Imeghairiwa'].includes(d.status))return alert('Delivery hii haiwezi kughairiwa tena');if(!await ask('Kughairi delivery '+d.no+' kutarudisha stock. Endelea?'))return}
+  try{await db.collection('deliveries').doc(id).update({status:s});if(s==='Imeghairiwa')await dvRestore(dvAllItems(d));logAct('Delivery '+d.no+': '+s);toast('Delivery '+d.no+': '+s)}catch(e){alert(e.message)}}
+async function dvDel(id){const d=DLV.find(x=>x.id===id);if(!d||!isMgr())return;if(!await ask('Kufuta delivery '+d.no+'? '+(['Inasubiri','Njiani'].includes(d.status)?'Stock itarudishwa.':'Mauzo yaliyokwisha rekodiwa yanabaki.')))return;
+  try{await db.collection('deliveries').doc(id).delete();if(['Inasubiri','Njiani'].includes(d.status))await dvRestore(dvAllItems(d));logAct('Delivery '+d.no+' imefutwa');toast('Imefutwa')}catch(e){alert(e.message)}}
+async function dvRemCust(id,i){const d=DLV.find(x=>x.id===id);if(!d||!['Inasubiri','Njiani'].includes(d.status))return;if(d.customers.length<2)return alert('Huyu ndiye mteja pekee. Ghairi delivery nzima badala yake.');
+  if(!await ask('Kumwondoa '+d.customers[i].name+' kwenye delivery hii? Stock yake itarudishwa.'))return;
+  const c=d.customers[i],cs=d.customers.filter((_,k)=>k!==i);try{await db.collection('deliveries').doc(id).update({customers:cs,grand:Math.round(sum(cs,x=>x.total))});await dvRestore(c.items);toast('Mteja ameondolewa')}catch(e){alert(e.message)}}
+async function dvSetDrv(id,i,drvId){const d=DLV.find(x=>x.id===id);if(!d)return;const e=DRV.find(x=>x.id===drvId)||{},cs=d.customers.map((c,k)=>k===i?{...c,drv:drvId,drvName:e.name||'',drvPhone:e.phone||''}:c);
+  try{await db.collection('deliveries').doc(id).update({customers:cs});toast('Anayepeleka amebadilishwa (namba ya invoice haibadiliki)')}catch(x){alert(x.message)}}
+function dvUpdBal(i,t){const v=Math.max(0,Math.min(parseFloat($('#dvpay_'+i).value)||0,t));$('#dvbal_'+i).textContent=TZS(t-v)}
+async function dvComplete(id){const d=DLV.find(x=>x.id===id);if(!d||['Imefikishwa','Imeghairiwa'].includes(d.status))return;
+  const cs=d.customers.map((c,i)=>{const t=Math.round(c.total),el=$('#dvpay_'+i);let p=el?parseFloat(el.value):t;if(!(p>=0))p=0;p=Math.min(p,t);return{...c,paid:p,balance:t-p,pst:t-p<=0?'Imelipwa':(p>0?'Sehemu':'Haijalipwa')}});
+  try{for(const c of cs){if(!c.cid){let e=byName(CL(),c.name);if(!e){const r=await db.collection('customers').add({name:c.name,phone:c.phone||'',addr:c.addr||'',at:SV()});e={id:r.id}}c.cid=e.id}}
+    await db.runTransaction(async t=>{const cref=db.collection('meta').doc('counter'),dref=db.collection('deliveries').doc(id),[cn,ds]=await Promise.all([t.get(cref),t.get(dref)]);
+      if(!ds.exists||['Imefikishwa','Imeghairiwa'].includes(ds.data().status))throw new Error('Delivery hii imeshakamilishwa au kughairiwa');
+      let n=cn.exists?cn.data().n:1000;
+      cs.forEach(c=>{n++;const oref=db.collection('orders').doc();c.oid=oref.id;c.ono=n;
+        t.set(oref,{no:n,uid:c.cid,cname:c.name,phone:c.phone||'',items:c.items,total:Math.round(c.total),disc:Math.round(c.disc||0),method:'delivery',addr:c.addr,note:'Delivery '+c.inv,status:'Delivered',source:'delivery',deliveryId:id,inv:c.inv,driver:c.drvName||d.drvName,paid:c.paid,payStatus:'done',cashier:me.name||'',cid:me.id,paidAt:SV(),branch:d.branch||me.branch||'',seller:me.name||'',sid:me.id,at:SV()})});
+      t.set(cref,{n});t.update(dref,{customers:cs,status:'Imefikishwa',done:dvDate(),grand:Math.round(sum(cs,c=>c.total))})});
+    dvComp=null;logAct('Delivery '+d.no+' imekamilika');render();toast('Delivery imekamilika. Mauzo yameingia kwenye Oda, na madeni yapo kwenye Madeni.')}catch(e){alert('Imeshindwa: '+e.message)}}
+/* ---- Print ---- */
+function dvCss(){return '<style>body{font:13px Arial,sans-serif;margin:10px;color:#000}h2,h3{margin:4px 0}.c{text-align:center}table{width:100%;border-collapse:collapse;margin:6px 0}th,td{border-bottom:1px solid #999;padding:4px 3px;text-align:left;font-size:12px}th:not(:first-child),td:not(:first-child){text-align:right}.t{border-top:2px solid #000;border-bottom:2px solid #000;padding:5px 0;font-weight:700;font-size:15px;display:flex;justify-content:space-between}img{width:110px}.pb{page-break-after:always;margin-bottom:18px}@page{margin:8mm}</style>'}
+function dvHead(){let l='logo.png';try{l=new URL('logo.png',location.href).href}catch(e){}return `<div class="c"><img src="${BIZ.logo||l}" alt=""><h2>${esc(BIZ.name||'LUKUBA SHOP')}</h2>${BIZ.phone?'<div>Simu: '+esc(BIZ.phone)+'</div>':''}${BIZ.address?'<div>'+esc(BIZ.address)+'</div>':''}</div><hr>`}
+const dvRows=items=>items.map(i=>lineParts(i).map(x=>`<tr><td>${esc(x.name)}</td><td>${x.qty}</td><td>${dvN(x.price)}</td><td>${dvN(x.total)}</td></tr>`).join('')).join('');
+function dvInvHtml(d,c){const done=d.status==='Imefikishwa';return `<div class="pb">${dvHead()}<h3 class="c">INVOICE ${esc(c.inv)}</h3><div>Delivery: ${esc(d.no)} · Tarehe: ${esc(d.date)}</div><div>Mteja: <b>${esc(c.name)}</b>${c.phone?' · '+esc(c.phone):''}</div><div>Anwani: ${esc(c.addr)}</div><div>Anayepeleka: ${esc(c.drvName||d.drvName)}${(c.drvPhone||d.drvPhone)?' ('+esc(c.drvPhone||d.drvPhone)+')':''}</div>
+  <table><tr><th>Bidhaa</th><th>Idadi</th><th>Bei</th><th>Jumla</th></tr>${dvRows(c.items)}</table>${c.disc?`<div style="display:flex;justify-content:space-between"><span>Punguzo</span><span>- ${dvN(c.disc)}</span></div>`:''}
+  <div class="t"><span>JUMLA</span><span>${TZS(c.total)}</span></div>${done?`<div style="display:flex;justify-content:space-between"><span>Amelipa</span><span>${TZS(c.paid)}</span></div>${c.balance>0?`<div style="display:flex;justify-content:space-between"><b>DENI</b><b>${TZS(c.balance)}</b></div>`:''}`:''}
+  <p class="c">${esc(BIZ.note||'Asante kwa kufanya biashara nasi. Karibu tena!')}</p></div>`}
+function dvPrintInv(id,i){const d=DLV.find(x=>x.id===id);if(d&&d.customers[i])printDoc(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(d.customers[i].inv)}</title>${dvCss()}</head><body>${dvInvHtml(d,d.customers[i])}</body></html>`)}
+function dvPrintBatch(d){if(!d)return;if(typeof d==='string')d=DLV.find(x=>x.id===d);if(!d)return;const tot={};
+  dvAllItems(d).forEach(i=>{const k=i.id;tot[k]=tot[k]||{name:i.name,qty:0,pk:i.pk};tot[k].qty+=i.qty});
+  printDoc(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(d.no)}</title>${dvCss()}</head><body><div class="pb">${dvHead()}<h3 class="c">ORODHA YA DELIVERY ${esc(d.no)}</h3><div>Tarehe: ${esc(d.date)} · Anayepeleka: <b>${esc(d.drvName)}</b>${d.drvPhone?' ('+esc(d.drvPhone)+')':''}</div><div>Wateja: ${d.customers.length} · Jumla: <b>${TZS(d.grand)}</b></div>
+  <h3>Mzigo wa kupakia</h3><table><tr><th>Bidhaa</th><th>Idadi</th></tr>${Object.values(tot).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(brk(x.qty,x.pk))}</td></tr>`).join('')}</table>
+  <h3>Wateja</h3><table><tr><th>Mteja</th><th>Anwani</th><th>Jumla</th></tr>${d.customers.map(c=>`<tr><td>${esc(c.name)}${c.phone?'<br>'+esc(c.phone):''}</td><td>${esc(c.addr)}</td><td>${dvN(c.total)}</td></tr>`).join('')}</table></div>${d.customers.map(c=>dvInvHtml(d,c)).join('')}</body></html>`)}
+/* ---- Tab ya Delivery ---- */
+function aDlv(){const isDrv=me.role==='driver',mk=!isDrv;
+  let L=DLV;if(isDrv)L=L.filter(d=>d.drvId===me.id||d.customers.some(c=>c.drv===me.id));if(dvF!=='zote')L=L.filter(d=>d.status===dvF);
+  const cartTot=sum(dv.cart,i=>i.price*i.qty);
+  const form=mk?dl('dlc',CL().map(c=>c.name))+dl('dlpd',dvPs().map(p=>p.name))+`<div class="box"><h3>🚚 Delivery mpya</h3>
+    <select onchange="dv.drv=this.value">${dvDrvOpts(dv.drv)}</select><input type="date" value="${esc(dv.date||dvDate())}" onchange="dv.date=this.value">
+    <b>1. Mteja</b><input id="dv_cn" list="dlc" data-cb="cust" placeholder="Jina la mteja (tafuta au andika jipya)" onchange="dvCust()"><input id="dv_cp" type="tel" placeholder="Simu"><input id="dv_ca" placeholder="Anwani / mahali pa kupeleka">
+    <b>2. Bidhaa za mteja huyu</b><input id="dv_p" list="dlpd" placeholder="Bidhaa (tafuta/chagua)" onchange="dvPick()"><div class="row"><select id="dv_u" onchange="dvUnit()" style="flex:1"></select><input id="dv_q" type="number" min="0" step="any" placeholder="Idadi" style="flex:1"></div><input id="dv_pr" type="number" min="0" step="any" placeholder="Bei kwa kipimo kilichochaguliwa"><div class="mu" id="dv_hint"></div>
+    <button class="b" onclick="dvAddItem()">+ Weka kwenye cart ya mteja</button>
+    ${dv.cart.map((i,k)=>`<div class="row" style="padding:4px 0"><span>${esc(i.name)} ×${esc(brk(i.qty,i.pk))}</span><b class="sp">${TZS(i.price*i.qty)}</b><button class="b d" onclick="dv.cart.splice(${k},1);render()">✖</button></div>`).join('')}
+    ${dv.cart.length?`<div style="text-align:right"><b>Jumla ndogo: ${TZS(cartTot)}</b></div>`:''}
+    <input id="dv_cd" type="number" min="0" placeholder="Punguzo (si lazima)"><button class="b g" onclick="dvAddCust()">✅ Ongeza mteja huyu kwenye delivery</button></div>
+  ${dv.batch.length?`<div class="box"><h3>Wateja kwenye delivery hii (${dv.batch.length})</h3>${dv.batch.map((c,i)=>`<div style="padding:6px 0;border-bottom:1px solid #e3e9f0"><div class="row"><b>${esc(c.name)}</b><b class="sp">${TZS(c.total)}</b><button class="b d" onclick="dvRemBatch(${i})">✖</button></div><div class="mu">📍 ${esc(c.addr)}${c.phone?' · '+esc(c.phone):''}</div><div class="mu">${dvItemsTxt(c.items)}${c.disc?' · punguzo '+TZS(c.disc):''}</div><select onchange="dvSetBatchDrv(${i},this.value)">${dvDrvOpts(c.drv)}</select></div>`).join('')}
+    <h3 style="text-align:right">Jumla ya delivery: ${TZS(sum(dv.batch,c=>c.total))}</h3><button class="b g" style="width:100%" onclick="dvFinal()">🚚 Kamilisha delivery na uchapishe</button></div>`:''}`:'';
+  const chips=`<div class="row tabs" style="margin:8px 0">${['zote',...DV_ST].map(s=>`<button class="b ${dvF===s?'':'s'}" onclick="dvF='${s}';render()">${s==='zote'?'Zote':s}</button>`).join('')}</div>`;
+  const list=L.map(d=>{const open=dvView===d.id,pend=['Inasubiri','Njiani'].includes(d.status);
+    return `<div class="box"><div class="row"><b>${esc(d.no)}</b>${dvBadge(d.status)}<span class="mu sp">${esc(d.date)}</span></div><div class="mu">🚚 ${esc(d.drvName||'-')} · Wateja ${d.customers.length} · <b>${TZS(d.grand)}</b></div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px"><button class="b s" onclick="dvView=${open?'null':`'${d.id}'`};dvComp=null;render()">${open?'Funga':'👁 Ona'}</button><button class="b s" onclick="dvPrintBatch('${d.id}')">🖨 Print</button>
+    ${d.status==='Inasubiri'?`<button class="b" onclick="dvStatus('${d.id}','Njiani')">🚚 Njiani</button>`:''}
+    ${pend&&mk?`<button class="b g" onclick="dvComp='${d.id}';dvView=null;render()">✅ Amerudi — kamilisha</button><button class="b d" onclick="dvStatus('${d.id}','Imeghairiwa')">Ghairi</button>`:''}
+    ${isMgr()?`<button class="b d" onclick="dvDel('${d.id}')">Futa</button>`:''}</div>
+    ${dvComp===d.id?dvCompCard(d):''}${open?dvDetail(d,pend&&mk):''}</div>`}).join('')||'<div class="box mu">Hakuna delivery.</div>';
+  return form+chips+list}
+function dvDetail(d,edit){return d.customers.map((c,i)=>`<div style="padding:8px 0;border-top:1px solid #e3e9f0"><div class="row"><b>${esc(c.name)}</b><span class="mu">${esc(c.inv)}</span><b class="sp">${TZS(c.total)}</b></div>
+  <div class="mu">📍 ${esc(c.addr)}${c.phone?' · '+esc(c.phone):''}</div><div class="mu">${dvItemsTxt(c.items)}${c.disc?' · punguzo '+TZS(c.disc):''}</div>
+  ${d.status==='Imefikishwa'?`<div class="mu">Amelipa ${TZS(c.paid)}${c.balance>0?' · <b style="color:#b91c1c">Deni '+TZS(c.balance)+'</b>':''} · ${esc(c.pst)}</div>`:''}
+  <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:4px">${edit?`<select onchange="dvSetDrv('${d.id}',${i},this.value)" style="flex:1">${dvDrvOpts(c.drv)}</select>`:`<span class="mu">🚚 ${esc(c.drvName||d.drvName)}</span>`}
+  <button class="b s" onclick="dvPrintInv('${d.id}',${i})">🖨 Invoice</button>${edit?`<button class="b d" onclick="dvRemCust('${d.id}',${i})">Ondoa</button>`:''}</div></div>`).join('')}
+function dvCompCard(d){return `<div style="border:2px solid var(--n);border-radius:10px;padding:8px;margin-top:8px"><b>✅ Thibitisha malipo — ${esc(d.no)}</b><p class="mu">Kiasi kilichoandikwa ni jumla ya mteja (tunadhani amelipa yote). Badilisha kama amepunguza au hajalipa. Baada ya kukamilisha, mauzo yanaingia kwenye Oda na mwenye balance anaingia kwenye Madeni.</p>
+  ${d.customers.map((c,i)=>{const t=Math.round(c.total);return `<div style="padding:6px 0;border-top:1px solid #e3e9f0"><div class="row"><b>${esc(c.name)}</b><b class="sp">${TZS(t)}</b></div><div class="row"><span class="mu">Amelipa</span><input id="dvpay_${i}" type="number" min="0" max="${t}" value="${t}" oninput="dvUpdBal(${i},${t})" style="flex:1;margin:0"><span class="mu">Balance: <b id="dvbal_${i}">${TZS(0)}</b></span></div></div>`}).join('')}
+  <div class="row" style="margin-top:8px"><button class="b s" onclick="dvComp=null;render()">Ghairi</button><button class="b g sp" onclick="dvComplete('${d.id}')">✅ Kamilisha na weka kwenye mauzo</button></div></div>`}
+</script>
 </body>
 </html>
